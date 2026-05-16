@@ -6,6 +6,7 @@ import issues from "./routes/issues.js";
 import me from "./routes/me.js";
 import internal from "./routes/internal.js";
 import ai from "./routes/ai.js";
+import attachments from "./routes/attachments.js";
 
 export type Role = "member" | "admin" | "viewer";
 
@@ -35,6 +36,7 @@ export const createApp = () => {
 
   app.route("/me", me);
   app.route("/issues", issues);
+  app.route("/issues/:id/attachments", attachments)
   app.route("/audit-logs", auditLogs);
   app.route("/internal", internal);
   app.route("/ai", ai)
