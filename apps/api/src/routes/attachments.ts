@@ -208,6 +208,68 @@ attachments.get("/", requireRole(["admin", "member", "viewer"]), async (c) => {
   })
 })
 
+attachments.delete("/:attachmentId", requireRole(["admin"]), async (c) => {
+  const user = c.get("user");
+  const issueId = c.req.param("id");
+  const attachmentId = c.req.param("attachmentId");
+
+  if (!issueId) {
+    return c.json({ error: "IssueId not found" }, 400);
+  }
+
+  if (!attachmentId) {
+    return c.json({ error: "AttachmentId not found" }, 400);
+  }
+
+  const { data: attachment, error: attachmentError } = await supabaseAdmin
+    .from("issue_attachments")
+    .select("id, issue_id, s3_key, file_name")
+    .eq("id", attachmentId)
+    .maybeSingle();
+
+  if (attachmentError) {
+    return c.json({ error: "Failed to fetch attachment" }, 500);
+  }
+
+  if (!attachment) {
+    return c.json({ error: "Attachment not found" }, 404);
+  }
+
+  if (attachment.issue_id !== issueId) {
+    return c.json({ error: "Attachment nof found in this issue" }, 404);
+  }
+
+  try {
+    await deleteS3Object({ key: attachment.s3_key })
+  } catch {
+    return c.json({ error: "Failed to delete S3 object" }, 500);
+  }
+
+  const { error: deleteError } = await supabaseAdmin
+    .from("issue_attachments")
+    .delete()
+    .eq("id", attachmentId);
+
+  if (deleteError) {
+    return c.json({ error: "Failed to delete attachment" }, 500);
+  }
+
+  await createAuditLog({
+    userId: user.id,
+    action: "issue_attachment.delete",
+    targetType: "issue_attachment",
+    targetId: attachment.id,
+    issueId,
+    detail: {
+      fileName: attachment.file_name,
+      s3Key: attachment.s3_key,
+    }
+  })
+
+  return c.json({ ok: true })
+})
 
 export default attachments;
+
+// deleteのapiが書き終わったが、CLIで叩いて確認をしていないのでそこからリスタートする。
 

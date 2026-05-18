@@ -16,6 +16,8 @@ export const formatAction = (action: string) => {
       return "確認しました";
     case "issue.assign":
       return "担当者を設定しました";
+    case "issue_attachment.delete":
+      return "画像を削除しました";
     default:
       return action;
   }
