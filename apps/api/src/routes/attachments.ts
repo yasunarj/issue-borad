@@ -4,7 +4,8 @@ import { z } from "zod";
 import { authMiddleware } from "../middleware/auth";
 import { requireRole } from "../middleware/requireRole";
 import { supabaseAdmin } from "../lib/supabase";
-import { createUploadSignedUrl, getIssueAttachmentKey } from "../lib/s3";
+import { createDownloadSignedUrl, createUploadSignedUrl, getIssueAttachmentKey, deleteS3Object } from "../lib/s3";
+import { createAuditLog } from "../lib/auditLog";
 
 const attachments = new Hono();
 
@@ -127,18 +128,18 @@ attachments.post("/", requireRole(["admin", "member"]), async (c) => {
   }
 
   const { data: attachment, error: insertError } = await supabaseAdmin
-  .from("issue_attachments")
-  .insert({
-    id: attachmentId,
-    issue_id: issueId,
-    uploaded_by: user.id,
-    s3_key: s3Key,
-    file_name: fileName,
-    content_type: contentType,
-    size_bytes: sizeBytes,
-  })
-  .select("id, issue_id, uploaded_by, s3_key, file_name, content_type, size_bytes, created_at")
-  .single()
+    .from("issue_attachments")
+    .insert({
+      id: attachmentId,
+      issue_id: issueId,
+      uploaded_by: user.id,
+      s3_key: s3Key,
+      file_name: fileName,
+      content_type: contentType,
+      size_bytes: sizeBytes,
+    })
+    .select("id, issue_id, uploaded_by, s3_key, file_name, content_type, size_bytes, created_at")
+    .single()
 
   if (insertError) {
     return c.json({ error: "Failed to create attachment" }, 500);
@@ -148,6 +149,65 @@ attachments.post("/", requireRole(["admin", "member"]), async (c) => {
     attachment,
   });
 });
+
+attachments.get("/", requireRole(["admin", "member", "viewer"]), async (c) => {
+  const issueId = c.req.param("id");
+
+  if (!issueId) {
+    return c.json({
+      error: "IssueId not found"
+    }, 400);
+  }
+
+  const { data: issue, error: issueError } = await supabaseAdmin
+    .from("issues")
+    .select("id")
+    .eq("id", issueId)
+    .maybeSingle()
+
+  if (issueError) {
+    return c.json({ error: "Failed to fetch issue" }, 500);
+  }
+
+  if (!issue) {
+    return c.json({ error: "Issue not found" }, 404);
+  }
+
+  const { data: attachments, error: attachmentsError } = await supabaseAdmin
+    .from("issue_attachments")
+    .select("id, issue_id, uploaded_by, s3_key, file_name, content_type, size_bytes, created_at")
+    .eq("issue_id", issueId)
+    .order("created_at", { ascending: false })
+
+  if (attachmentsError) {
+    return c.json({
+      error: "Failed to fetch attachments"
+    }, 500);
+  }
+
+  const attachmentsWithUrls = await Promise.all(
+    (attachments ?? []).map(async (attachment) => {
+      const url = await createDownloadSignedUrl({ key: attachment.s3_key });
+
+      return {
+        id: attachment.id,
+        issueId: attachment.issue_id,
+        uploadedBy: attachment.uploaded_by,
+        s3Key: attachment.s3_key,
+        fileName: attachment.file_name,
+        contentType: attachment.content_type,
+        sizeBytes: attachment.size_bytes,
+        createdAt: attachment.created_at,
+        url,
+      }
+    })
+  )
+
+  return c.json({
+    attachments: attachmentsWithUrls
+  })
+})
+
 
 export default attachments;
 
