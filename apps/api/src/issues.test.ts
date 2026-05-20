@@ -80,6 +80,20 @@ vi.mock("./lib/supabase", () => {
   }
 })
 
+const createUploadSignedUrlMock = vi.fn();
+const createDownloadSignedUrlMock = vi.fn();
+const deleteS3ObjectMock = vi.fn()
+const getIssueAttachmentKeyMock = vi.fn();
+
+vi.mock("./lib/s3", () => {
+  return {
+    createUploadSignedUrl: createUploadSignedUrlMock,
+    createDownloadSignedUrl: createDownloadSignedUrlMock,
+    deleteS3Object: deleteS3ObjectMock,
+    getIssueAttachmentKey: getIssueAttachmentKeyMock,
+  }
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   fromMock.mockReset();
@@ -87,10 +101,23 @@ beforeEach(() => {
   responsesCreateMock.mockReset();
   getUserByIdMock.mockReset();
 
+
+  createUploadSignedUrlMock.mockReset();
+  createDownloadSignedUrlMock.mockReset();
+  deleteS3ObjectMock.mockReset();
+  getIssueAttachmentKeyMock.mockReset();
+
+  createUploadSignedUrlMock.mockResolvedValue("https://example.com/upload-url");
+  createDownloadSignedUrlMock.mockResolvedValue("https://example.com/download-url");
+  deleteS3ObjectMock.mockResolvedValue(undefined);
+  getIssueAttachmentKeyMock.mockReturnValue("issues/issue-1/attachments/attachment-1-test.jpg");
+
+
   process.env.OPENAI_API_KEY = "test-openai-key";
   process.env.CRON_SECRET = "test-cron-secret";
   process.env.INTERNAL_API_SECRET = "test-internal-secret";
   process.env.APP_BASE_URL = "http://localhost:3000";
+  //この環境変数はなぜbeforeEachに書いているのか？これを書くと環境変数もmock化してくれるのか？
 });
 
 const request = async (
@@ -133,12 +160,34 @@ const buildIssueSelectFoundMock = () => ({
   })
 })
 
+const buildIssueMaybeFoundMock = () => ({
+  select: () => ({
+    eq: () => ({
+      maybeSingle: async () => ({
+        data: { id: "issue-1" },
+        error: null,
+      })
+    })
+  })
+})
+
 const buildIssueNotFoundMock = () => ({
   select: () => ({
     eq: () => ({
       single: async () => ({
         data: null,
         error: { message: "DB issue not found" }
+      })
+    })
+  })
+})
+
+const buildIssueMaybeNotFoundMock = () => ({
+  select: () => ({
+    eq: () => ({
+      maybeSingle: async () => ({
+        data: null,
+        error: null,
       })
     })
   })
@@ -1902,4 +1951,127 @@ describe("app", () => {
     vi.useRealTimers();
   });
 
+  it("member は attachment upload-url を取得できる", async () => {
+    mockTables({
+      issues: buildIssueMaybeFoundMock()
+    });
+
+    const { createApp } = await import("./app.js");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments/upload-url", {
+      method: "POST",
+      headers: {
+        "x-test-role": "member",
+      },
+      body: JSON.stringify({
+        fileName: "test.jpg",
+        contentType: "image/jpeg",
+        sizeBytes: 123456,
+      })
+    });
+
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as any;
+
+    expect(body.uploadUrl).toBe("https://example.com/upload-url");
+    expect(body.s3Key).toBe("issues/issue-1/attachments/attachment-1-test.jpg");
+    expect(body.fileName).toBe("test.jpg");
+    expect(body.contentType).toBe("image/jpeg")
+    expect(body.sizeBytes).toBe(123456);
+    expect(body.uploadedBy).toBe("user-1");
+
+    expect(createUploadSignedUrlMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: "issues/issue-1/attachments/attachment-1-test.jpg",
+        contentType: "image/jpeg",
+      })
+    )
+
+    expect(getIssueAttachmentKeyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueId: "issue-1",
+        fileName: "test.jpg",
+      })
+    )
+  })
+
+  it("viewer は attachment upload-url が発行されない", async () => {
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments/upload-url", {
+      method: "POST",
+      headers: {
+        "x-test-role": "viewer"
+      },
+      body: JSON.stringify({
+        fileName: "test.jpg",
+        contentType: "image/jpeg",
+        sizeBytes: 123456,
+      })
+    })
+
+    expect(res.status).toBe(403);
+
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Forbidden");
+    expect(fromMock).not.toHaveBeenCalled();
+    expect(createUploadSignedUrlMock).not.toHaveBeenCalled();
+  })
+
+  it("attachment upload-url の body が不正の場合 400 を返す", async ()=> {
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments/upload-url", {
+      method: "POST",
+      headers: {
+        "x-test-role": "member",
+      },
+      body: JSON.stringify({
+        fileName: "",
+        contentType: "image/jpeg",
+        sizeBytes: -1
+      })
+    })
+
+    expect(res.status).toBe(400);
+
+    const body = await res.json() as { error: string };
+
+    expect(body.error).toBe("Invalid request body");
+
+    expect(fromMock).not.toHaveBeenCalled();
+    expect(createUploadSignedUrlMock).not.toHaveBeenCalled();
+  })
+
+  it("attachment upload-url で issue が見つからない場合 404 を返す", async () => {
+    mockTables({
+      issues: buildIssueMaybeNotFoundMock(),
+    })
+
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-999/attachments/upload-url", {
+      method: "POST",
+      headers: {
+        "x-test-role": "member",
+      },
+      body: JSON.stringify({
+        fileName: "test.jpg",
+        contentType: "image/jpeg",
+        sizeBytes: 123456
+      })
+    })
+
+    expect(res.status).toBe(404);
+
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Issue not found");
+
+    expect(createUploadSignedUrlMock).not.toHaveBeenCalled();
+  })
 })
