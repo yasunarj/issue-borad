@@ -271,5 +271,4 @@ attachments.delete("/:attachmentId", requireRole(["admin"]), async (c) => {
 
 export default attachments;
 
-// deleteのapiが書き終わったが、CLIで叩いて確認をしていないのでそこからリスタートする。
 
