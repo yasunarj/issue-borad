@@ -541,6 +541,37 @@ const buildReminderIssuesFailedMock = () => ({
   })
 })
 
+const buildAttachmentInsertSuccessMock = () => ({
+  insert: () => ({
+    select: () => ({
+      single: async () => ({
+        data: {
+          id: "attachment-1",
+          issue_id: "issue-1",
+          uploaded_by: "user-1",
+          s3_key: "issues/issue-1/attachments/attachment-1-test.jpg",
+          file_name: "test.jpg",
+          content_type: "image/jpeg",
+          size_bytes: 123456,
+          created_at: "2026-05-17T00:00:00.000Z",
+        },
+        error: null
+      })
+    })
+  })
+})
+
+const buildAttachmentInsertFailedMock = () => ({
+  insert: () => ({
+    select: () => ({
+      single: async () => ({
+        data: null,
+        error: { message: "DB insert failed" }
+      })
+    })
+  })
+})
+
 describe("app", () => {
   it("GET /health で ok: true を返す", async () => {
     const { createApp } = await import("./app");
@@ -2021,7 +2052,7 @@ describe("app", () => {
     expect(createUploadSignedUrlMock).not.toHaveBeenCalled();
   })
 
-  it("attachment upload-url の body が不正の場合 400 を返す", async ()=> {
+  it("attachment upload-url の body が不正の場合 400 を返す", async () => {
     const { createApp } = await import("./app");
     const app = createApp();
 
@@ -2074,4 +2105,150 @@ describe("app", () => {
 
     expect(createUploadSignedUrlMock).not.toHaveBeenCalled();
   })
+
+  it("member は S3 にアップロード済み attachment を DB に登録できる", async () => {
+    mockTables({
+      issues: buildIssueMaybeFoundMock(),
+      issue_attachments: buildAttachmentInsertSuccessMock(),
+    });
+
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments", {
+      method: "POST",
+      headers: {
+        "x-test-role": "member",
+      },
+      body: JSON.stringify({
+        attachmentId: "550e8400-e29b-41d4-a716-446655440000",
+        s3Key: "issues/issue-1/attachments/550e8400-e29b-41d4-a716-446655440000-test.jpg",
+        fileName: "test.jpg",
+        contentType: "image/jpeg",
+        sizeBytes: 123456,
+      })
+    })
+
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as any;
+
+    expect(body.attachment).toEqual({
+      id: "attachment-1",
+      issue_id: "issue-1",
+      uploaded_by: "user-1",
+      s3_key: "issues/issue-1/attachments/attachment-1-test.jpg",
+      file_name: "test.jpg",
+      content_type: "image/jpeg",
+      size_bytes: 123456,
+      created_at: "2026-05-17T00:00:00.000Z"
+    })
+  });
+
+  it("viewer は DB に attachment を登録できない", async () => {
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments", {
+      method: "POST",
+      headers: {
+        "x-test-role": "viewer"
+      },
+      body: JSON.stringify({
+        attachmentId: "550e8400-e29b-41d4-a716-446655440000",
+        s3Key: "issues/issue-1/attachments/550e8400-e29b-41d4-a716-446655440000-test.jpg",
+        fileName: "test.jpg",
+        contentType: "image/jpeg",
+        sizeBytes: 123456,
+      })
+    });
+
+    expect(res.status).toBe(403);
+
+    const body = await res.json() as { error: string };
+
+    expect(body.error).toBe("Forbidden");
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it("attachment 登録 body が不正なら 400 を返す", async () => {
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments", {
+      method: "POST",
+      headers: {
+        "x-test-role": "member",
+      },
+      body: JSON.stringify({
+        attachmentId: "1",
+        s3Key: "issues-1",
+        fileName: "test.jpg",
+        contentType: "image/jpeg",
+        sizeBytes: -1,
+      })
+    })
+
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Invalid request body");
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it("attachment 登録時に issue が見つからないと 404 を返す", async () => {
+    mockTables({
+      issues: buildIssueMaybeNotFoundMock()
+    });
+
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-999/attachments", {
+      method: "POST",
+      headers: {
+        "x-test-role": "member",
+      },
+      body: JSON.stringify({
+        attachmentId: "550e8400-e29b-41d4-a716-446655440000",
+        s3Key: "issues/issue-999/attachments/550e8400-e29b-41d4-a716-446655440000-test.jpg",
+        fileName: "test.jpg",
+        contentType: "image/jpeg",
+        sizeBytes: 123456,
+      })
+    })
+
+    expect(res.status).toBe(404);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Issue not found");
+  });
+
+  it("attachment 登録に失敗すると 500 を返す", async () => {
+    mockTables({
+      issues: buildIssueMaybeFoundMock(),
+      issue_attachments: buildAttachmentInsertFailedMock()
+    })
+
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments", {
+      method: "POST",
+      headers: {
+        "x-test-role": "member",
+      },
+      body: JSON.stringify({
+        attachmentId: "550e8400-e29b-41d4-a716-446655440000",
+        s3Key: "issues/issue-1/attachments/550e8400-e29b-41d4-a716-446655440000-test.jpg",
+        fileName: "test.jpg",
+        contentType: "image/jpeg",
+        sizeBytes: 123456,
+      })
+    })
+
+    expect(res.status).toBe(500);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Failed to create attachment");
+  });
+
+  
 })
