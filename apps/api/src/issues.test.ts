@@ -572,6 +572,100 @@ const buildAttachmentInsertFailedMock = () => ({
   })
 })
 
+const buildAttachmentsListMock = () => ({
+  select: () => ({
+    eq: () => ({
+      order: async () => ({
+        data: [
+          {
+            id: "attachment-1",
+            issue_id: "issue-1",
+            uploaded_by: "user-1",
+            s3_key: "issues/issue-1/attachments/attachment-1-test.jpg",
+            file_name: "test.jpg",
+            content_type: "image/jpeg",
+            size_bytes: 123456,
+            created_at: "2026-05-17T00:00:00.000Z",
+          }
+        ],
+        error: null
+      })
+    })
+  })
+})
+
+const buildAttachmentsListFailedMock = () => ({
+  select: () => ({
+    eq: () => ({
+      order: async () => ({
+        data: null,
+        error: { message: "DB fetch attachment failed" }
+      })
+    })
+  })
+})
+
+const buildAttachmentFoundMock = () => ({
+  select: () => ({
+    eq: () => ({
+      maybeSingle: async () => ({
+        data: {
+          id: "attachment-1",
+          issue_id: "issue-1",
+          s3_key: "issues/issue-1/attachments/attachment-1-test.jpg",
+          file_name: "test.jpg",
+        },
+        error: null,
+      })
+    })
+  })
+})
+
+const buildAttachmentNotFoundMock = () => ({
+  select: () => ({
+    eq: () => ({
+      maybeSingle: async () => ({
+        data: null,
+        error: null,
+      })
+    })
+  })
+})
+
+const buildAttachmentDifferentIssueMock = () => ({
+  select: () => ({
+    eq: () => ({
+      maybeSingle: async () => ({
+        data: {
+          id: "attachment-1",
+          issue_id: "other-issue",
+          s3_key: "issues/issue-1/attachments/attachment-1-test.jpg",
+          file_name: "test.jpg",
+        },
+        error: null,
+      })
+    })
+  })
+})
+
+const buildAttachmentDeleteSuccessMock = () => ({
+  ...buildAttachmentFoundMock(),
+  delete: () => ({
+    eq: async () => ({
+      error: null
+    })
+  })
+})
+
+const buildAttachmentDeleteFailedMock = () => ({
+  ...buildAttachmentFoundMock(),
+  delete: () => ({
+    eq: async () => ({
+      error: { message: "attachment delete fetch failed" }
+    })
+  })
+})
+
 describe("app", () => {
   it("GET /health で ok: true を返す", async () => {
     const { createApp } = await import("./app");
@@ -2250,5 +2344,247 @@ describe("app", () => {
     expect(body.error).toBe("Failed to create attachment");
   });
 
-  
+  it("member は attachment 一覧を取得できる", async () => {
+    mockTables({
+      issues: buildIssueMaybeFoundMock(),
+      issue_attachments: buildAttachmentsListMock()
+    });
+
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments", {
+      method: "GET",
+      headers: {
+        "x-test-role": "member",
+      }
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.attachments).toHaveLength(1);
+
+    expect(body.attachments[0]).toEqual({
+      id: "attachment-1",
+      issueId: "issue-1",
+      uploadedBy: "user-1",
+      s3Key: "issues/issue-1/attachments/attachment-1-test.jpg",
+      fileName: "test.jpg",
+      contentType: "image/jpeg",
+      sizeBytes: 123456,
+      createdAt: "2026-05-17T00:00:00.000Z",
+      url: "https://example.com/download-url"
+    })
+  })
+
+  it("viewer も attachment 一覧を取得できる", async () => {
+    mockTables({
+      issues: buildIssueMaybeFoundMock(),
+      issue_attachments: buildAttachmentsListMock(),
+    });
+
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments", {
+      method: "GET",
+      headers: {
+        "x-test-role": "viewer",
+      }
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.attachments).toHaveLength(1);
+    expect(body.attachments[0].url).toBe("https://example.com/download-url")
+  });
+
+  it("attachment 一覧取得時に issue が無い場合 404 を返す", async () => {
+    mockTables({
+      issues: buildIssueMaybeNotFoundMock(),
+    })
+
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-999/attachments", {
+      method: "GET",
+      headers: {
+        "x-test-role": "member",
+      }
+    });
+
+    expect(res.status).toBe(404);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Issue not found");
+
+    expect(createDownloadSignedUrlMock).not.toHaveBeenCalled();
+  });
+
+  it("attachment 一覧取得に失敗すると 500 を返す", async () => {
+    mockTables({
+      issues: buildIssueMaybeFoundMock(),
+      issue_attachments: buildAttachmentsListFailedMock(),
+    });
+
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments", {
+      method: "GET",
+      headers: {
+        "x-test-role": "member",
+      }
+    });
+
+    expect(res.status).toBe(500);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Failed to fetch attachments");
+    expect(createDownloadSignedUrlMock).not.toHaveBeenCalled()
+  });
+
+  it("admin は attachment を削除できる", async () => {
+    mockTables({
+      issue_attachments: buildAttachmentDeleteSuccessMock(),
+    })
+
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments/attachment-1", {
+      method: "DELETE",
+      headers: {
+        "x-test-role": "admin",
+      }
+    })
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ok: boolean };
+    expect(body).toEqual({ ok: true });
+    expect(deleteS3ObjectMock).toHaveBeenCalledWith({
+      key: "issues/issue-1/attachments/attachment-1-test.jpg",
+    });
+
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "issue_attachment.delete",
+        targetType: "issue_attachment",
+        targetId: "attachment-1",
+        issueId: "issue-1",
+      })
+    )
+  })
+
+  it("member は attachment を削除できない", async () => {
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments/attachment-1", {
+      method: "DELETE",
+      headers: {
+        "x-test-role": "member",
+      }
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Forbidden");
+    expect(deleteS3ObjectMock).not.toHaveBeenCalled();
+  })
+
+  it("attachment が見つからない時に 404 を返す", async () => {
+    mockTables({
+      issue_attachments: buildAttachmentNotFoundMock(),
+    });
+
+    const { createApp } = await import("./app")
+    const app = createApp();
+
+    const res = await request(app, "/issues/issues-1/attachments/attachment-999", {
+      method: "DELETE",
+      headers: {
+        "x-test-role": "admin",
+      }
+    });
+
+    expect(res.status).toBe(404);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Attachment not found");
+
+    expect(deleteS3ObjectMock).not.toHaveBeenCalled();
+    expect(createAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("attachment が 別の issue に紐づいている場合に 404 を返す", async () => {
+    mockTables({
+      issue_attachments: buildAttachmentDifferentIssueMock(),
+    });
+
+    const { createApp } = await import("./app");
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments/attachment-1", {
+      method: "DELETE",
+      headers: {
+        "x-test-role": "admin"
+      }
+    });
+
+    expect(res.status).toBe(404);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Attachment not found in this issue");
+
+    expect(deleteS3ObjectMock).not.toHaveBeenCalled();
+    expect(createAuditLog).not.toHaveBeenCalled();
+  })
+
+  it("S3 attachment の削除に失敗すると 500 を返し createAuditLog は呼ばれない", async () => {
+    deleteS3ObjectMock.mockRejectedValueOnce(new Error("S3 delete failed"));
+
+    mockTables({
+      issue_attachments: buildAttachmentDeleteSuccessMock()
+    });
+
+    const { createApp } = await import("./app")
+    const app = createApp();
+
+    const res = await request(app, "/issues/issue-1/attachments/attachment-1", {
+      method: "DELETE",
+      headers: {
+        "x-test-role": "admin",
+      }
+    });
+
+    expect(res.status).toBe(500);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Failed to delete S3 object")
+
+    expect(createAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("DB で削除に失敗した場合 500 を返し createAuditLog は呼ばれない", async () => {
+    mockTables({
+      issue_attachments: buildAttachmentDeleteFailedMock(),
+    })
+
+    const { createApp } = await import("./app");
+    const app = createApp();
+    
+    const res = await request(app, "/issues/issue-1/attachments/attachment-1", {
+      method: "DELETE",
+      headers: {
+        "x-test-role": "admin"
+      }
+    });
+
+    expect(res.status).toBe(500);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Failed to delete attachment");
+
+    expect(deleteS3ObjectMock).toHaveBeenCalledWith({
+      key: "issues/issue-1/attachments/attachment-1-test.jpg"
+    })
+
+    expect(createAuditLog).not.toHaveBeenCalled();
+  })
 })

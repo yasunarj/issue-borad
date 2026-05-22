@@ -236,7 +236,7 @@ attachments.delete("/:attachmentId", requireRole(["admin"]), async (c) => {
   }
 
   if (attachment.issue_id !== issueId) {
-    return c.json({ error: "Attachment nof found in this issue" }, 404);
+    return c.json({ error: "Attachment not found in this issue" }, 404);
   }
 
   try {
