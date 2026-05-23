@@ -256,7 +256,7 @@ attachments.delete("/:attachmentId", requireRole(["admin"]), async (c) => {
 
   await createAuditLog({
     userId: user.id,
-    action: "issue_attachment.delete",
+    action: "issue.attachment.delete",
     targetType: "issue_attachment",
     targetId: attachment.id,
     issueId,

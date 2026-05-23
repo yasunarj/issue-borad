@@ -2467,7 +2467,7 @@ describe("app", () => {
 
     expect(createAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: "issue_attachment.delete",
+        action: "issue.attachment.delete",
         targetType: "issue_attachment",
         targetId: "attachment-1",
         issueId: "issue-1",
