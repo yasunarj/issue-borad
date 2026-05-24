@@ -13,6 +13,7 @@ import { useIssueDetail } from "../hooks/useIssueDetail";
 import AssigneeSection from "../components/AssigneeSection";
 import LoadingButton from "@/app/components/LoadingButton";
 import { useRequireAuth } from "@/app/hooks/useRequireAuth";
+import AttachmentSection from "../components/AttachmentSection";
 
 const IssueDetailPage = () => {
   const params = useParams<{ id: string }>();
@@ -428,6 +429,14 @@ const IssueDetailPage = () => {
                   : "-"}
               </span>
             </div>
+
+            <AttachmentSection 
+              issueId={issueId}
+              canUpload={canResolve}
+              isAdmin={isAdmin}
+              setMessage={setMessage}
+              onChanged={fetchAuditLogs}
+            />
 
             <CheckSection
               issueId={issueId}
