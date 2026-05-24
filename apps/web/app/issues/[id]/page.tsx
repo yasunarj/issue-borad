@@ -505,4 +505,3 @@ const IssueDetailPage = () => {
 
 export default IssueDetailPage;
 
-// codexにリファクタリングを依頼中。。次は型の整合性について確認をしてもらう。
