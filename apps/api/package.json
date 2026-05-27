@@ -6,7 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts"
+    "start": "tsx src/server.ts",
+    "typeCheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",

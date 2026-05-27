@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
-import { authMiddleware } from "../middleware/auth";
-import { requireRole } from "../middleware/requireRole";
-import { supabaseAdmin } from "../lib/supabase";
-import { createDownloadSignedUrl, createUploadSignedUrl, getIssueAttachmentKey, deleteS3Object } from "../lib/s3";
-import { createAuditLog } from "../lib/auditLog";
+import { authMiddleware } from "../middleware/auth.js";
+import { requireRole } from "../middleware/requireRole.js";
+import { supabaseAdmin } from "../lib/supabase.js";
+import { createDownloadSignedUrl, createUploadSignedUrl, getIssueAttachmentKey, deleteS3Object } from "../lib/s3.js";
+import { createAuditLog } from "../lib/auditLog.js";
 
 const attachments = new Hono();
 
