@@ -243,38 +243,94 @@ const AttachmentSection = ({
       </div>
 
       {canUpload && (
-        <div className="mb-5 flex flex-col gap-3 border-b border-slate-100 pb-5">
-          <label className="flex flex-col gap-2 mt-6">
-            <span className="text-sm font-medium text-slate-700">
-              画像を選択
-            </span>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              capture="environment"
-              className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
-              onChange={(e) => {
-                setSelectedFile(e.target.files?.[0] ?? null);
-              }}
-            />
-          </label>
+        <div className="mb-6 border-b border-slate-100 pb-6">
+          <div className="flex flex-col gap-4">
+            <div className="mt-4">
+              <h4 className="text-sm font-semibold text-slate-800">
+                画像を追加
+              </h4>
+              <p className="mt-1 text-xs text-slate-500">
+                写真を撮影するか、端末内の画像を選択してください
+              </p>
+            </div>
 
-          {selectedFile && (
-            <p className="text-xs text-slate-500">
-              選択中: {selectedFile.name} /{" "}
-              {(selectedFile.size / 1024 / 1024).toFixed(2)}MB
-            </p>
-          )}
+            <div className="flex flex-wrap gap-3">
+              <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                  <circle cx="12" cy="13" r="3" />
+                </svg>
+                写真を撮る
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    setSelectedFile(e.target.files?.[0] ?? null);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
 
-          <LoadingButton
-            className="w-fit rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={handleUpload}
-            isLoading={isUploading}
-            loadingText="アップロード中..."
-            disabled={!selectedFile}
-          >
-            画像を添付
-          </LoadingButton>
+              <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+                  <path d="m8 15 2.5-3 2 2.5L15 12l3 4" />
+                </svg>
+                ファイルを選択
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    setSelectedFile(e.target.files?.[0] ?? null);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+
+            {selectedFile && (
+              <div className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                選択中:{" "}
+                <span className="font-medium text-slate-800">
+                  {selectedFile.name}
+                </span>{" "}
+                / {(selectedFile.size / 1024 / 1024).toFixed(2)}MB
+              </div>
+            )}
+
+            <LoadingButton
+              className="w-fit rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={handleUpload}
+              isLoading={isUploading}
+              loadingText="アップロード中..."
+              disabled={!selectedFile}
+            >
+              画像を添付
+            </LoadingButton>
+          </div>
         </div>
       )}
 
