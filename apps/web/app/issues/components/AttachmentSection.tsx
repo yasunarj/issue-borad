@@ -137,11 +137,10 @@ const AttachmentSection = ({
       const s3Res = await fetch(uploadUrlData.uploadUrl, {
         method: "PUT",
         headers: {
-          "Content-Type": selectedFile.type, 
+          "Content-Type": selectedFile.type,
         },
-        body: selectedFile, 
+        body: selectedFile,
       });
-
 
       if (!s3Res.ok) {
         setMessage({
@@ -179,7 +178,7 @@ const AttachmentSection = ({
       setMessage({ text: "画像を添付しました", type: "success" });
 
       await fetchAttachments();
-      await onChanged?.(); 
+      await onChanged?.();
     } catch (e) {
       setMessage({
         text:
@@ -231,7 +230,7 @@ const AttachmentSection = ({
 
   return (
     <section className="rounded-md border border-slate-100 bg-white p-4">
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb- flex items-center justify-between gap-3">
         <div>
           <h3 className="font-semibold text-slate-900">添付画像</h3>
           <p className="mt-1 text-xs text-slate-500">
@@ -244,19 +243,24 @@ const AttachmentSection = ({
       </div>
 
       {canUpload && (
-        <div className="mb-5 flex flex-col gap-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-4">
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp" 
-            className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-blue-500 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
-            onChange={(e) => {
-              setSelectedFile(e.target.files?.[0] ?? null);
-            }}
-            // 今回はファイルを選択する形になっているが、カメラボタンを作成してカメラを起動して撮った写真をそのまま添付するような実装も可能なのか？？(カメラはモバイルだけで良いかと思う)
-          />
+        <div className="mb-5 flex flex-col gap-3 border-b border-slate-100 pb-5">
+          <label className="flex flex-col gap-2 mt-6">
+            <span className="text-sm font-medium text-slate-700">
+              画像を選択
+            </span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              capture="environment"
+              className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+              onChange={(e) => {
+                setSelectedFile(e.target.files?.[0] ?? null);
+              }}
+            />
+          </label>
 
           {selectedFile && (
-            <p>
+            <p className="text-xs text-slate-500">
               選択中: {selectedFile.name} /{" "}
               {(selectedFile.size / 1024 / 1024).toFixed(2)}MB
             </p>
@@ -309,11 +313,11 @@ const AttachmentSection = ({
                   </p>
                 </div>
                 {isAdmin && (
-                  <LoadingButton 
-                  className="w-fit rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
-                  onClick={() => handleDelete(attachment.id)}
-                  isLoading={deletingAttachmentId === attachment.id}
-                  loadingText="削除中..."
+                  <LoadingButton
+                    className="w-fit rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+                    onClick={() => handleDelete(attachment.id)}
+                    isLoading={deletingAttachmentId === attachment.id}
+                    loadingText="削除中..."
                   >
                     削除
                   </LoadingButton>
