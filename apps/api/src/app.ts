@@ -27,7 +27,7 @@ export const createApp = () => {
         "http://localhost:3000",
         "https://issue-board-web-umber.vercel.app",
       ],
-      allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+      allowMethods: ["GET", "POST", "PATCH", "DELETE", "PUT", "OPTIONS"],
       allowHeaders: ["Content-Type", "Authorization"],
     }),
   );

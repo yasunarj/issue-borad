@@ -53,7 +53,7 @@ const AttachmentSection = ({
   const fetchAttachments = useCallback(async () => {
     setIsLoadingAttachment(true);
     try {
-      const res = await apiFetch(`/issues/${issueId}/attachment`);
+      const res = await apiFetch(`/issues/${issueId}/attachments`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -64,21 +64,20 @@ const AttachmentSection = ({
         return;
       }
 
-      setAttachments(attachments ?? []);
+      setAttachments(data.attachments ?? []);
     } catch (e) {
       setMessage({
         text: e instanceof Error ? e.message : "添付画像の取得に失敗しました",
-        // e instanceof Errorの意味を知りたい。これはeがErrorでない時もあるということ？
         type: "error",
       });
     } finally {
       setIsLoadingAttachment(false);
     }
-  }, [issueId, attachments, setMessage]);
+  }, [issueId, setMessage]);
 
   useEffect(() => {
-    if (issueId) return;
-    fetchAttachments(); //await は必要ないのか？ handleUploadやhandleDeleteではawaitが使用されているが、、、
+    if (!issueId) return;
+    fetchAttachments();
   }, [issueId, fetchAttachments]);
 
   const handleUpload = async () => {
@@ -90,7 +89,7 @@ const AttachmentSection = ({
       return;
     }
 
-    if (allowedTypes.includes(selectedFile.type)) {
+    if (!allowedTypes.includes(selectedFile.type)) {
       setMessage({
         text: "アップロードできる画像は jpeg ping webp のみです",
         type: "error",
@@ -135,15 +134,14 @@ const AttachmentSection = ({
         return;
       }
 
-      const s3Res = await apiFetch(uploadUrlData.uploadUrl, {
-        method: "POST",
+      const s3Res = await fetch(uploadUrlData.uploadUrl, {
+        method: "PUT",
         headers: {
-          "Content-Type": selectedFile.type, //これはどんな形式？？そもそもselectedFileの中身はどんなかんじなの？？
+          "Content-Type": selectedFile.type, 
         },
-        body: selectedFile, //JSON形式でなくてOKなのか？
+        body: selectedFile, 
       });
 
-      //ここの部分はaws側のapiなのでどのようになっているかわからないが、成功した場合にはどのような結果が返ってくるのか？
 
       if (!s3Res.ok) {
         setMessage({
@@ -181,7 +179,7 @@ const AttachmentSection = ({
       setMessage({ text: "画像を添付しました", type: "success" });
 
       await fetchAttachments();
-      await onChanged?.(); //onChanged関数はcreateLogを更新する関数であっているか？
+      await onChanged?.(); 
     } catch (e) {
       setMessage({
         text:
@@ -194,7 +192,7 @@ const AttachmentSection = ({
   };
 
   const handleDelete = async (attachmentId: string) => {
-    if (confirm("添付画像を削除してよろしいですか？")) return;
+    if (!confirm("添付画像を削除してよろしいですか？")) return;
 
     setDeletingAttachmentId(attachmentId);
     setMessage(null);
@@ -249,12 +247,11 @@ const AttachmentSection = ({
         <div className="mb-5 flex flex-col gap-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-4">
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp" //acceptとは何？？
+            accept="image/jpeg,image/png,image/webp" 
             className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-blue-500 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
             onChange={(e) => {
               setSelectedFile(e.target.files?.[0] ?? null);
             }}
-            // files[0]となっているということは複数も可能ということになっているのか？？今回は１つだけの選択?
             // 今回はファイルを選択する形になっているが、カメラボタンを作成してカメラを起動して撮った写真をそのまま添付するような実装も可能なのか？？(カメラはモバイルだけで良いかと思う)
           />
 
@@ -262,7 +259,6 @@ const AttachmentSection = ({
             <p>
               選択中: {selectedFile.name} /{" "}
               {(selectedFile.size / 1024 / 1024).toFixed(2)}MB
-              {/* toFixedは指定した桁数以下の切り捨てだった気がするが詳細を教えて */}
             </p>
           )}
 
@@ -293,18 +289,17 @@ const AttachmentSection = ({
               key={attachment.id}
               className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm"
             >
-              <a href={attachment.url} target="_blank" rel-noreferrer>
+              <a href={attachment.url} target="_blank" rel="noreferrer">
                 <img
                   src={attachment.url}
                   alt={attachment.fileName}
                   className="h-48 w-full object-cover"
                 />
-                {/* // Imageを推奨するような警告が出ているのですが、変えますか */}
+                {/* // Next.jsなのでImageを推奨するような警告が出ているのですが、変えますか */}
               </a>
 
               <div className="flex flex-col gap-2 p-3">
                 <div className="truncate text-sm font-medium text-slate-800">
-                  {/* // truncateとは何か？ */}
                   <p className="text-xs text-slate-500">
                     {attachment.fileName}
                   </p>
