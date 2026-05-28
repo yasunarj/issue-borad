@@ -4,7 +4,7 @@ import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { supabaseAdmin } from "../lib/supabase.js";
-import { createDownloadSignedUrl, createUploadSignedUrl, getIssueAttachmentKey, deleteS3Object } from "../lib/s3.js";
+import { createDownloadSignedUrl, createUploadSignedUrl, getIssueAttachmentOriginalKey, deleteS3Object, getIssueAttachmentThumbnailKey } from "../lib/s3.js";
 import { createAuditLog } from "../lib/auditLog.js";
 
 const attachments = new Hono();
@@ -22,6 +22,7 @@ const uploadUrlSchema = z.object({
 const createAttachmentSchema = z.object({
   attachmentId: z.uuid(),
   s3Key: z.string().min(1),
+  thumbnailS3Key: z.string().min(1),
   fileName: z.string().min(1).max(255),
   contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
   sizeBytes: z.number().int().positive().max(5 * 1024 * 1024), //5MB
@@ -68,7 +69,13 @@ attachments.post("/upload-url", requireRole(["admin", "member"]), async (c) => {
 
   const attachmentId = randomUUID();
 
-  const s3Key = getIssueAttachmentKey({
+  const s3Key = getIssueAttachmentOriginalKey({
+    issueId,
+    attachmentId,
+    fileName,
+  })
+
+  const thumbnailS3Key = getIssueAttachmentThumbnailKey({
     issueId,
     attachmentId,
     fileName,
@@ -82,6 +89,7 @@ attachments.post("/upload-url", requireRole(["admin", "member"]), async (c) => {
   return c.json({
     attachmentId,
     s3Key,
+    thumbnailS3Key,
     fileName,
     contentType,
     sizeBytes,
@@ -109,7 +117,7 @@ attachments.post("/", requireRole(["admin", "member"]), async (c) => {
     }, 400)
   }
 
-  const { attachmentId, s3Key, fileName, contentType, sizeBytes } = parsed.data;
+  const { attachmentId, s3Key, thumbnailS3Key, fileName, contentType, sizeBytes } = parsed.data;
 
   const { data: issue, error: issueError } = await supabaseAdmin
     .from("issues")
@@ -134,11 +142,12 @@ attachments.post("/", requireRole(["admin", "member"]), async (c) => {
       issue_id: issueId,
       uploaded_by: user.id,
       s3_key: s3Key,
+      thumbnail_s3_key: thumbnailS3Key,
       file_name: fileName,
       content_type: contentType,
       size_bytes: sizeBytes,
     })
-    .select("id, issue_id, uploaded_by, s3_key, file_name, content_type, size_bytes, created_at")
+    .select("id, issue_id, uploaded_by, s3_key, thumbnail_s3_key, file_name, content_type, size_bytes, created_at")
     .single()
 
   if (insertError) {
@@ -175,7 +184,7 @@ attachments.get("/", requireRole(["admin", "member", "viewer"]), async (c) => {
 
   const { data: attachments, error: attachmentsError } = await supabaseAdmin
     .from("issue_attachments")
-    .select("id, issue_id, uploaded_by, s3_key, file_name, content_type, size_bytes, created_at")
+    .select("id, issue_id, uploaded_by, s3_key, thumbnail_s3_key, thumbnail_status, thumbnail_created_at, file_name, content_type, size_bytes, created_at")
     .eq("issue_id", issueId)
     .order("created_at", { ascending: false })
 
@@ -194,6 +203,7 @@ attachments.get("/", requireRole(["admin", "member", "viewer"]), async (c) => {
         issueId: attachment.issue_id,
         uploadedBy: attachment.uploaded_by,
         s3Key: attachment.s3_key,
+        thumbnailS3Key: attachment.thumbnail_s3_key,
         fileName: attachment.file_name,
         contentType: attachment.content_type,
         sizeBytes: attachment.size_bytes,

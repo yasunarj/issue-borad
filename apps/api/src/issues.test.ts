@@ -83,14 +83,16 @@ vi.mock("./lib/supabase", () => {
 const createUploadSignedUrlMock = vi.fn();
 const createDownloadSignedUrlMock = vi.fn();
 const deleteS3ObjectMock = vi.fn()
-const getIssueAttachmentKeyMock = vi.fn();
+const getIssueAttachmentOriginalKeyMock = vi.fn();
+const getIssueAttachmentThumbnailKeyMock = vi.fn();
 
 vi.mock("./lib/s3", () => {
   return {
     createUploadSignedUrl: createUploadSignedUrlMock,
     createDownloadSignedUrl: createDownloadSignedUrlMock,
     deleteS3Object: deleteS3ObjectMock,
-    getIssueAttachmentKey: getIssueAttachmentKeyMock,
+    getIssueAttachmentOriginalKey: getIssueAttachmentOriginalKeyMock,
+    getIssueAttachmentThumbnailKey: getIssueAttachmentThumbnailKeyMock
   }
 });
 
@@ -105,12 +107,14 @@ beforeEach(() => {
   createUploadSignedUrlMock.mockReset();
   createDownloadSignedUrlMock.mockReset();
   deleteS3ObjectMock.mockReset();
-  getIssueAttachmentKeyMock.mockReset();
+  getIssueAttachmentOriginalKeyMock.mockReset();
+  getIssueAttachmentThumbnailKeyMock.mockReset();
 
   createUploadSignedUrlMock.mockResolvedValue("https://example.com/upload-url");
   createDownloadSignedUrlMock.mockResolvedValue("https://example.com/download-url");
   deleteS3ObjectMock.mockResolvedValue(undefined);
-  getIssueAttachmentKeyMock.mockReturnValue("issues/issue-1/attachments/attachment-1-test.jpg");
+  getIssueAttachmentOriginalKeyMock.mockReturnValue("issues/issue-1/attachments/original/attachment-1-test.jpg");
+  getIssueAttachmentThumbnailKeyMock.mockReturnValue("issues/issue-1/attachments/thumbnails/attachment-1-test.jpg");
 
 
   process.env.OPENAI_API_KEY = "test-openai-key";
@@ -549,7 +553,8 @@ const buildAttachmentInsertSuccessMock = () => ({
           id: "attachment-1",
           issue_id: "issue-1",
           uploaded_by: "user-1",
-          s3_key: "issues/issue-1/attachments/attachment-1-test.jpg",
+          s3_key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
+          thumbnail_s3_key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
           file_name: "test.jpg",
           content_type: "image/jpeg",
           size_bytes: 123456,
@@ -581,7 +586,8 @@ const buildAttachmentsListMock = () => ({
             id: "attachment-1",
             issue_id: "issue-1",
             uploaded_by: "user-1",
-            s3_key: "issues/issue-1/attachments/attachment-1-test.jpg",
+            s3_key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
+            thumbnail_s3_key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
             file_name: "test.jpg",
             content_type: "image/jpeg",
             size_bytes: 123456,
@@ -2101,7 +2107,8 @@ describe("app", () => {
     const body = await res.json() as any;
 
     expect(body.uploadUrl).toBe("https://example.com/upload-url");
-    expect(body.s3Key).toBe("issues/issue-1/attachments/attachment-1-test.jpg");
+    expect(body.s3Key).toBe("issues/issue-1/attachments/original/attachment-1-test.jpg");
+    expect(body.thumbnailS3Key).toBe("issues/issue-1/attachments/thumbnails/attachment-1-test.jpg");
     expect(body.fileName).toBe("test.jpg");
     expect(body.contentType).toBe("image/jpeg")
     expect(body.sizeBytes).toBe(123456);
@@ -2109,12 +2116,19 @@ describe("app", () => {
 
     expect(createUploadSignedUrlMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        key: "issues/issue-1/attachments/attachment-1-test.jpg",
+        key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
         contentType: "image/jpeg",
       })
     )
 
-    expect(getIssueAttachmentKeyMock).toHaveBeenCalledWith(
+    expect(getIssueAttachmentOriginalKeyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueId: "issue-1",
+        fileName: "test.jpg",
+      })
+    )
+
+    expect(getIssueAttachmentThumbnailKeyMock).toHaveBeenCalledWith(
       expect.objectContaining({
         issueId: "issue-1",
         fileName: "test.jpg",
@@ -2216,7 +2230,8 @@ describe("app", () => {
       },
       body: JSON.stringify({
         attachmentId: "550e8400-e29b-41d4-a716-446655440000",
-        s3Key: "issues/issue-1/attachments/550e8400-e29b-41d4-a716-446655440000-test.jpg",
+        s3Key: "issues/issue-1/attachments/original/550e8400-e29b-41d4-a716-446655440000-test.jpg",
+        thumbnailS3Key: "issues/issue-1/attachments/thumbnails/550e8400-e29b-41d4-a716-446655440000-test.jpg",
         fileName: "test.jpg",
         contentType: "image/jpeg",
         sizeBytes: 123456,
@@ -2231,7 +2246,8 @@ describe("app", () => {
       id: "attachment-1",
       issue_id: "issue-1",
       uploaded_by: "user-1",
-      s3_key: "issues/issue-1/attachments/attachment-1-test.jpg",
+      s3_key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
+      thumbnail_s3_key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
       file_name: "test.jpg",
       content_type: "image/jpeg",
       size_bytes: 123456,
@@ -2304,7 +2320,8 @@ describe("app", () => {
       },
       body: JSON.stringify({
         attachmentId: "550e8400-e29b-41d4-a716-446655440000",
-        s3Key: "issues/issue-999/attachments/550e8400-e29b-41d4-a716-446655440000-test.jpg",
+        s3Key: "issues/issue-999/attachments/original/550e8400-e29b-41d4-a716-446655440000-test.jpg",
+        thumbnailS3Key: "issues/issue-999/attachments/thumbnails/550e8400-e29b-41d4-a716-446655440000-test.jpg",
         fileName: "test.jpg",
         contentType: "image/jpeg",
         sizeBytes: 123456,
@@ -2332,7 +2349,8 @@ describe("app", () => {
       },
       body: JSON.stringify({
         attachmentId: "550e8400-e29b-41d4-a716-446655440000",
-        s3Key: "issues/issue-1/attachments/550e8400-e29b-41d4-a716-446655440000-test.jpg",
+        s3Key: "issues/issue-1/attachments/original/550e8400-e29b-41d4-a716-446655440000-test.jpg",
+        thumbnailS3Key: "issues/issue-1/attachments/thumbnails/550e8400-e29b-41d4-a716-446655440000-test.jpg",
         fileName: "test.jpg",
         contentType: "image/jpeg",
         sizeBytes: 123456,
@@ -2368,7 +2386,8 @@ describe("app", () => {
       id: "attachment-1",
       issueId: "issue-1",
       uploadedBy: "user-1",
-      s3Key: "issues/issue-1/attachments/attachment-1-test.jpg",
+      s3Key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
+      thumbnailS3Key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
       fileName: "test.jpg",
       contentType: "image/jpeg",
       sizeBytes: 123456,

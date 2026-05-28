@@ -19,7 +19,7 @@ if (!bucketName) {
 
 export const s3Client = new S3Client({ region });
 
-export const getIssueAttachmentKey = ({
+export const getIssueAttachmentOriginalKey = ({
   issueId,
   attachmentId,
   fileName,
@@ -30,9 +30,23 @@ export const getIssueAttachmentKey = ({
 }) => {
   const safeFileName = fileName.replace(/[^\w.\-]/g, "_");
 
-  return `issues/${issueId}/attachments/${attachmentId}-${safeFileName}`;
+  return `issues/${issueId}/attachments/original/${attachmentId}-${safeFileName}`;
 };
 
+export const getIssueAttachmentThumbnailKey = ({
+  issueId,
+  attachmentId,
+  fileName,
+}: {
+  issueId: string;
+  attachmentId: string;
+  fileName: string;
+}) => {
+  const safeFileName = fileName.replace(/[^\w.\-]/g, "_");
+
+  return `issues/${issueId}/attachments/thumbnails/${attachmentId}-${safeFileName}`
+}
+// issues/74887736-7a85-48bc-86e9-270c45696584/attachments/2b64c612-d8d5-4f77-89fc-2adeb8db4e18-IMG_3957.jpeg
 export const createUploadSignedUrl = async ({
   key,
   contentType,
