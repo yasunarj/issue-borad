@@ -158,6 +158,7 @@ const AttachmentSection = ({
         body: JSON.stringify({
           attachmentId: uploadUrlData.attachmentId,
           s3Key: uploadUrlData.s3Key,
+          thumbnailS3Key: uploadUrlData.thumbnailS3Key,
           fileName: selectedFile.name,
           contentType: selectedFile.type,
           sizeBytes: selectedFile.size,

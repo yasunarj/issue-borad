@@ -204,6 +204,8 @@ attachments.get("/", requireRole(["admin", "member", "viewer"]), async (c) => {
         uploadedBy: attachment.uploaded_by,
         s3Key: attachment.s3_key,
         thumbnailS3Key: attachment.thumbnail_s3_key,
+        thumbnail_status: attachment.thumbnail_status,
+        thumbnail_created_at: attachment.thumbnail_created_at,
         fileName: attachment.file_name,
         contentType: attachment.content_type,
         sizeBytes: attachment.size_bytes,

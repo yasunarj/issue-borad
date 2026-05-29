@@ -336,5 +336,14 @@ API 側では Vitest を利用してルート単位のテストを実施して�
 - [ ] テスト方針の追記
 - [ ] UIの細かな改善
 
+## AWSの機能実装
+- [ ] S3画像添付機能
+- [ ] Lambdaでサムネイル生成
+- [ ] CloudWatch LogsでLambdaログ確認
+- [ ] issue_attachments に thumbnail_s3_key を追加
+- [ ] フロントで一覧表示はサムネイル、クリックで原寸画像
+- [ ] EventBridge + Lambdaで不要S3ファイル掃除
+- [ ] 必要ならCloudFront
+
 
 

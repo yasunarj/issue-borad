@@ -121,7 +121,6 @@ beforeEach(() => {
   process.env.CRON_SECRET = "test-cron-secret";
   process.env.INTERNAL_API_SECRET = "test-internal-secret";
   process.env.APP_BASE_URL = "http://localhost:3000";
-  //この環境変数はなぜbeforeEachに書いているのか？これを書くと環境変数もmock化してくれるのか？
 });
 
 const request = async (
@@ -555,6 +554,8 @@ const buildAttachmentInsertSuccessMock = () => ({
           uploaded_by: "user-1",
           s3_key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
           thumbnail_s3_key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
+          thumbnail_status: "pending",
+          thumbnail_created_at: null,
           file_name: "test.jpg",
           content_type: "image/jpeg",
           size_bytes: 123456,
@@ -588,6 +589,8 @@ const buildAttachmentsListMock = () => ({
             uploaded_by: "user-1",
             s3_key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
             thumbnail_s3_key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
+            thumbnail_status: "pending",
+            thumbnail_created_at: null,
             file_name: "test.jpg",
             content_type: "image/jpeg",
             size_bytes: 123456,
@@ -2248,6 +2251,8 @@ describe("app", () => {
       uploaded_by: "user-1",
       s3_key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
       thumbnail_s3_key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
+      thumbnail_status: "pending",
+      thumbnail_created_at: null,
       file_name: "test.jpg",
       content_type: "image/jpeg",
       size_bytes: 123456,
@@ -2388,6 +2393,8 @@ describe("app", () => {
       uploadedBy: "user-1",
       s3Key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
       thumbnailS3Key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
+      thumbnail_status: "pending",
+      thumbnail_created_at: null,
       fileName: "test.jpg",
       contentType: "image/jpeg",
       sizeBytes: 123456,
