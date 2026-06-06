@@ -1,7 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
+**/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -41,3 +42,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# build outputs
+dist/
+**/dist/
+
+# lambda deploy artifacts
+apps/infra/lambda-thumbnail/deploy/
+
+# vite / vitest artifacts
+.vite/
+**/.vite/
