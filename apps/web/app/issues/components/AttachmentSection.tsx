@@ -14,6 +14,7 @@ type Attachment = {
   sizeBytes: number;
   createdAt: string;
   url: string;
+  thumbnailUrl?: string;
 };
 
 type MessageSetter = (
@@ -352,11 +353,10 @@ const AttachmentSection = ({
             >
               <a href={attachment.url} target="_blank" rel="noreferrer">
                 <img
-                  src={attachment.url}
+                  src={attachment.thumbnailUrl ?? attachment.url}
                   alt={attachment.fileName}
                   className="h-48 w-full object-cover"
                 />
-                {/* // Next.jsなのでImageを推奨するような警告が出ているのですが、変えますか */}
               </a>
 
               <div className="flex flex-col gap-2 p-3">

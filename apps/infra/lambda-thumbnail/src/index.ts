@@ -92,6 +92,8 @@ export const handler = async (event: S3Event) => {
       console.log("original format", metadata.format);
 
       const thumbnailBuffer = await sharp(imageBuffer)
+        .rotate()
+        // スマホで撮影した場合、画像が回転して表示されてしまうのでrotateを使用して回転させる
         .resize({
           width: 400,
           withoutEnlargement: true,
@@ -160,3 +162,28 @@ export const handler = async (event: S3Event) => {
 };
 
 
+
+// cd apps/infra
+// npm run typeCheck
+// npm run build
+
+// rm -rf lambda-thumbnail/deploy
+// mkdir -p lambda-thumbnail/deploy
+
+// cp lambda-thumbnail/dist/index.js lambda-thumbnail/deploy/index.js
+
+// cat > lambda-thumbnail/deploy/package.json <<'EOF'
+// {
+//   "type": "module",
+//   "dependencies": {
+//     "@aws-sdk/client-s3": "^3.1056.0",
+//     "@supabase/supabase-js": "^2.106.2",
+//     "sharp": "^0.34.5"
+//   }
+// }
+// EOF
+
+// cd lambda-thumbnail/deploy
+// npm install --omit=dev --os=linux --cpu=x64 --libc=glibc
+
+// zip -r function.zip index.js package.json node_modules

@@ -196,7 +196,10 @@ attachments.get("/", requireRole(["admin", "member", "viewer"]), async (c) => {
 
   const attachmentsWithUrls = await Promise.all(
     (attachments ?? []).map(async (attachment) => {
-      const url = await createDownloadSignedUrl({ key: attachment.s3_key });
+      // const url = await createDownloadSignedUrl({ key: attachment.s3_key });
+      const originalUrl = await createDownloadSignedUrl({ key: attachment.s3_key });
+
+      const thumbnailUrl = attachment.thumbnail_status === "completed" && attachment.thumbnail_s3_key ? await createDownloadSignedUrl({ key: attachment.thumbnail_s3_key }) : null;
 
       return {
         id: attachment.id,
@@ -204,13 +207,14 @@ attachments.get("/", requireRole(["admin", "member", "viewer"]), async (c) => {
         uploadedBy: attachment.uploaded_by,
         s3Key: attachment.s3_key,
         thumbnailS3Key: attachment.thumbnail_s3_key,
-        thumbnail_status: attachment.thumbnail_status,
-        thumbnail_created_at: attachment.thumbnail_created_at,
+        thumbnailStatus: attachment.thumbnail_status,
+        thumbnailCreatedAt: attachment.thumbnail_created_at,
         fileName: attachment.file_name,
         contentType: attachment.content_type,
         sizeBytes: attachment.size_bytes,
         createdAt: attachment.created_at,
-        url,
+        url: originalUrl,
+        thumbnailUrl,
       }
     })
   )
@@ -235,7 +239,7 @@ attachments.delete("/:attachmentId", requireRole(["admin"]), async (c) => {
 
   const { data: attachment, error: attachmentError } = await supabaseAdmin
     .from("issue_attachments")
-    .select("id, issue_id, s3_key, file_name")
+    .select("id, issue_id, s3_key, file_name, thumbnail_s3_key")
     .eq("id", attachmentId)
     .maybeSingle();
 
@@ -252,7 +256,11 @@ attachments.delete("/:attachmentId", requireRole(["admin"]), async (c) => {
   }
 
   try {
-    await deleteS3Object({ key: attachment.s3_key })
+    await deleteS3Object({ key: attachment.s3_key });
+
+    if (attachment.thumbnail_s3_key) {
+      await deleteS3Object({ key: attachment.thumbnail_s3_key });
+    }
   } catch {
     return c.json({ error: "Failed to delete S3 object" }, 500);
   }

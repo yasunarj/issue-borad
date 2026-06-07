@@ -111,7 +111,17 @@ beforeEach(() => {
   getIssueAttachmentThumbnailKeyMock.mockReset();
 
   createUploadSignedUrlMock.mockResolvedValue("https://example.com/upload-url");
-  createDownloadSignedUrlMock.mockResolvedValue("https://example.com/download-url");
+  createDownloadSignedUrlMock.mockImplementation(async ({ key }: { key: string }) => {
+    if (key.includes("/attachments/original/")) {
+      return "https://example.com/original-url"
+    }
+
+    if (key.includes("/attachments/thumbnails/")) {
+      return "https://example.com/thumbnail-url"
+    }
+
+    return "https://exapmale.com/download-url"
+  })
   deleteS3ObjectMock.mockResolvedValue(undefined);
   getIssueAttachmentOriginalKeyMock.mockReturnValue("issues/issue-1/attachments/original/attachment-1-test.jpg");
   getIssueAttachmentThumbnailKeyMock.mockReturnValue("issues/issue-1/attachments/thumbnails/attachment-1-test.jpg");
@@ -554,8 +564,8 @@ const buildAttachmentInsertSuccessMock = () => ({
           uploaded_by: "user-1",
           s3_key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
           thumbnail_s3_key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
-          thumbnail_status: "pending",
-          thumbnail_created_at: null,
+          thumbnail_status: "completed",
+          thumbnail_created_at: "2026-06-07T00:00:00.000Z",
           file_name: "test.jpg",
           content_type: "image/jpeg",
           size_bytes: 123456,
@@ -589,8 +599,8 @@ const buildAttachmentsListMock = () => ({
             uploaded_by: "user-1",
             s3_key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
             thumbnail_s3_key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
-            thumbnail_status: "pending",
-            thumbnail_created_at: null,
+            thumbnail_status: "completed",
+            thumbnail_created_at: "2026-06-07T00:00:00.000Z",
             file_name: "test.jpg",
             content_type: "image/jpeg",
             size_bytes: 123456,
@@ -621,7 +631,8 @@ const buildAttachmentFoundMock = () => ({
         data: {
           id: "attachment-1",
           issue_id: "issue-1",
-          s3_key: "issues/issue-1/attachments/attachment-1-test.jpg",
+          s3_key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
+          thumbnail_s3_key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
           file_name: "test.jpg",
         },
         error: null,
@@ -2251,8 +2262,8 @@ describe("app", () => {
       uploaded_by: "user-1",
       s3_key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
       thumbnail_s3_key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
-      thumbnail_status: "pending",
-      thumbnail_created_at: null,
+      thumbnail_status: "completed",
+      thumbnail_created_at: "2026-06-07T00:00:00.000Z",
       file_name: "test.jpg",
       content_type: "image/jpeg",
       size_bytes: 123456,
@@ -2393,13 +2404,22 @@ describe("app", () => {
       uploadedBy: "user-1",
       s3Key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
       thumbnailS3Key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
-      thumbnail_status: "pending",
-      thumbnail_created_at: null,
+      thumbnailStatus: "completed",
+      thumbnailCreatedAt: "2026-06-07T00:00:00.000Z",
       fileName: "test.jpg",
       contentType: "image/jpeg",
       sizeBytes: 123456,
       createdAt: "2026-05-17T00:00:00.000Z",
-      url: "https://example.com/download-url"
+      url: "https://example.com/original-url",
+      thumbnailUrl: "https://example.com/thumbnail-url",
+    })
+
+    expect(createDownloadSignedUrlMock).toHaveBeenCalledWith({
+      key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
+    })
+
+    expect(createDownloadSignedUrlMock).toHaveBeenCalledWith({
+      key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg",
     })
   })
 
@@ -2422,7 +2442,8 @@ describe("app", () => {
     expect(res.status).toBe(200);
     const body = await res.json() as any;
     expect(body.attachments).toHaveLength(1);
-    expect(body.attachments[0].url).toBe("https://example.com/download-url")
+    expect(body.attachments[0].url).toBe("https://example.com/original-url")
+    expect(body.attachments[0].thumbnailUrl).toBe("https://example.com/thumbnail-url")
   });
 
   it("attachment 一覧取得時に issue が無い場合 404 を返す", async () => {
@@ -2488,7 +2509,10 @@ describe("app", () => {
     const body = await res.json() as { ok: boolean };
     expect(body).toEqual({ ok: true });
     expect(deleteS3ObjectMock).toHaveBeenCalledWith({
-      key: "issues/issue-1/attachments/attachment-1-test.jpg",
+      key: "issues/issue-1/attachments/original/attachment-1-test.jpg",
+    });
+    expect(deleteS3ObjectMock).toHaveBeenCalledWith({
+      key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg"
     });
 
     expect(createAuditLog).toHaveBeenCalledWith(
@@ -2595,7 +2619,7 @@ describe("app", () => {
 
     const { createApp } = await import("./app");
     const app = createApp();
-    
+
     const res = await request(app, "/issues/issue-1/attachments/attachment-1", {
       method: "DELETE",
       headers: {
@@ -2608,7 +2632,10 @@ describe("app", () => {
     expect(body.error).toBe("Failed to delete attachment");
 
     expect(deleteS3ObjectMock).toHaveBeenCalledWith({
-      key: "issues/issue-1/attachments/attachment-1-test.jpg"
+      key: "issues/issue-1/attachments/original/attachment-1-test.jpg"
+    })
+    expect(deleteS3ObjectMock).toHaveBeenCalledWith({
+      key: "issues/issue-1/attachments/thumbnails/attachment-1-test.jpg"
     })
 
     expect(createAuditLog).not.toHaveBeenCalled();

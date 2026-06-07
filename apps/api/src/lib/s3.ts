@@ -46,7 +46,6 @@ export const getIssueAttachmentThumbnailKey = ({
 
   return `issues/${issueId}/attachments/thumbnails/${attachmentId}-${safeFileName}`
 }
-// issues/74887736-7a85-48bc-86e9-270c45696584/attachments/2b64c612-d8d5-4f77-89fc-2adeb8db4e18-IMG_3957.jpeg
 export const createUploadSignedUrl = async ({
   key,
   contentType,
