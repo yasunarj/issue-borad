@@ -1,8 +1,2 @@
 {
-  "crons": [
-    {
-      "path": "/internal/reminders/run",
-      "schedule": "30 19 * * *"
-    }
-  ]
 }
