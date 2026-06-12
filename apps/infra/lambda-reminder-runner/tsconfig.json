@@ -1,12 +1,49 @@
 {
   "compilerOptions": {
+    // compilerOptionsの中に書くものは、TypeScriptに対して、どういうJavaScriptに変換するのか、import/exportはどう扱うのか、Node.jsの方は使うか。という指示を出している
     "target": "ES2022",
+    // target はどのバージョンの JavaScript に変換するかを決める設定
     "module": "NodeNext",
+    // import / export をどのような形式で扱うか CommonJs や ES Modules などの種類がある
     "moduleResolution": "NodeNext",
+    // import したファイルやライブラリを、TypeScriptがどう探すかを決める設定
     "strict": true,
+    // strict は型チェックを厳しくする設定
     "esModuleInterop": true,
+    // CommonJs のライブラリを、 ES Modules っぽく import しやすくする設定
     "skipLibCheck": true,
-    "types": ["node", "aws-lambda"]
+    // node_modules などに入っているライブラリ側の型定義ファイルの細かいチェックを省略する設定、自分で書いたコードにだけ TypeScript を使用した場合にしないとビルドに時間がかかってしまう。
+    "types": ["node", "aws-lambda"],
+    // 使う型定義を明示する設定
+    "rootDir": "src",
+    // TypeScript の元ファイルの基準フォルダ
+    "outDir": "dist",
+    // 変換後の JavaScript をどこに出力するか。この設定の場合は dist/index.js として出力される
+    "sourceMap": true
+    // - エラーが起きた時に、元の TypeScript ファイルの場所を追いやすくする設定
   },
   "include": ["src/**/*.ts"]
+    // TypeScript がチェック対象にするファイルを指定する設定
 }
+
+// その他によく使用される設定についての紹介
+  // "noEmit": true - 型チェックだけして JavaScript ファイルは出力しない
+  // "resolveJsonModule": true - JSON ファイルを import できるようにする
+  // "baseUrl": ".",
+  // "paths": {
+        // "@/*": ["src/*"]
+  // } - baseUrl/paths は import のパスを短くする設定
+
+// Next.js用の tsconfig と Lambda用の tsconfig は目的が異なる
+  // ・Lambda は Node.js 上で動く
+  // ・Next.js　は Next.js/webpack/TurboPack などのビルドツール側が処理する
+
+
+// まとめ
+  // ・src フォルダ内の TypeScript ファイルを対象にする - tsconfig.json
+  // ・Node.js の新しい import/export ルールに合わせて処理する - modules
+  // ・出力する JavaScript は ES2002 相当にする - target
+  // ・型チェックは厳しくする - strict
+  // ・CommonJs 系ライブラリも import しやすくする - esModuleInterop
+  // ・ライブラリ側の型定義チェックは深追いしない - skipLibCheck
+  // ・Node.js と AWS Lambda の方を使用できるようにする - types
