@@ -3,6 +3,7 @@ import { AppEnv } from "../app";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { sendMail } from "../lib/sendMail.js";
 import { buildIssueMailTemplate } from "../lib/issueMailTemplate.js";
+import { sendSesMail } from "../lib/sendSesMail";
 
 const internal = new Hono<AppEnv>();
 
@@ -155,6 +156,32 @@ internal.get("/reminders/run", async (c) => {
     sentCount,
     skippedCount,
   }, 200);
+});
+
+internal.get("/ses/test", async (c) => {
+  const internalSecret = c.req.header("x-internal-secret");
+
+  if (internalSecret !== process.env.INTERNAL_API_SECRET) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const to = process.env.SES_TEST_TO_EMAIL;
+
+  if (!to) {
+    return c.json({ error: "SES_TEST_TO_EMAIL missing" }, 500);
+  }
+
+  const result = await sendSesMail({
+    to,
+    subject: "SES SDK test from Issue Board",
+    text: "Hono APIからAmazon SES SDKを使って送信したテストメールです。",
+    html: "<p>Hono APIからAmazon SES SDKを使って送信したテストメールです。</p>",
+  });
+
+  return c.json({
+    message: "SES test email sent",
+    messageId: result.MessageId,
+  });
 });
 
 export default internal;
