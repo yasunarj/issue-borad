@@ -3,8 +3,6 @@ import {
   SendEmailCommand,
 } from "@aws-sdk/client-ses";
 
-
-
 type SendSesMailParams = {
   to: string;
   subject: string;
