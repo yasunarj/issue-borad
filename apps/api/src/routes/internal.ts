@@ -3,7 +3,7 @@ import { AppEnv } from "../app";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { sendMail } from "../lib/sendMail.js";
 import { buildIssueMailTemplate } from "../lib/issueMailTemplate.js";
-import { sendSesMail } from "../lib/sendSesMail";
+import { sendSesMail } from "../lib/sendSesMail.js";
 
 const internal = new Hono<AppEnv>();
 
