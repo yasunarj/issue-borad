@@ -3,20 +3,7 @@ import {
   SendEmailCommand,
 } from "@aws-sdk/client-ses";
 
-const region = process.env.AWS_REGION;
-const fromEmail = process.env.SES_FROM_EMAIL;
 
-if (!region) {
-  throw new Error("AWS_REGION missing");
-}
-
-if (!fromEmail) {
-  throw new Error("SES_FROM_EMAIL missing");
-}
-
-const sesClient = new SESClient({
-  region,
-});
 
 type SendSesMailParams = {
   to: string;
@@ -31,6 +18,19 @@ export const sendSesMail = async ({
   text,
   html,
 }: SendSesMailParams) => {
+  const region = process.env.AWS_REGION;
+  const fromEmail = process.env.SES_FROM_EMAIL;
+
+  if (!region) {
+    throw new Error("AWS_REGION missing");
+  }
+
+  if (!fromEmail) {
+    throw new Error("SES_FROM_EMAIL missing");
+  }
+  const sesClient = new SESClient({
+    region,
+  });
   const command = new SendEmailCommand({
     Source: fromEmail,
     Destination: {
@@ -48,11 +48,11 @@ export const sendSesMail = async ({
         },
         ...(html
           ? {
-              Html: {
-                Data: html,
-                Charset: "UTF-8",
-              },
-            }
+            Html: {
+              Data: html,
+              Charset: "UTF-8",
+            },
+          }
           : {}),
       },
     },
