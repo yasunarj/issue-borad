@@ -4,6 +4,7 @@ import { supabaseAdmin } from "../lib/supabase.js";
 import { sendMail } from "../lib/sendMail.js";
 import { buildIssueMailTemplate } from "../lib/issueMailTemplate.js";
 import { sendSesMail } from "../lib/sendSesMail.js";
+import { addDaysToDateKey, getJstDateKey } from "../lib/dateKey.js";
 
 const internal = new Hono<AppEnv>();
 
@@ -13,7 +14,7 @@ internal.get("/reminders/run", async (c) => {
 
   const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
   const isManual = internalSecret === process.env.INTERNAL_API_SECRET;
-  
+
   if (!isCron && !isManual) {
     return c.json({ error: "Unauthorized" }, 401);
   }
@@ -49,33 +50,23 @@ internal.get("/reminders/run", async (c) => {
     }, 200);
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const isSameDate = (a: Date, b: Date) => {
-    return (
-      a.getFullYear() === b.getFullYear() &&
-      a.getMonth() === b.getMonth() &&
-      a.getDate() === b.getDate()
-    )
-  }
+  const todayKey = getJstDateKey();
 
   const targets = issues.map((issue) => {
-    const dueDate = new Date(issue.due_date);
-    dueDate.setHours(0, 0, 0, 0);
+    const dueDateKey = issue.due_date;
+    const threeDaysBeforeKey = addDaysToDateKey(dueDateKey, -3);
 
-    const threeDaysBefore = new Date(dueDate);
-    threeDaysBefore.setDate(dueDate.getDate() - 3);
+    const shouldSendDue =
+      todayKey === dueDateKey && issue.reminder_due_sent_at === null;
 
-    const shouldSendDue = isSameDate(today, dueDate) && issue.reminder_due_sent_at === null;
-
-    const shouldSend3Days = isSameDate(today, threeDaysBefore) && issue.reminder_3days_sent_at === null;
+    const shouldSend3Days =
+      todayKey === threeDaysBeforeKey && issue.reminder_3days_sent_at === null;
 
     return {
       ...issue,
       shouldSend3Days,
       shouldSendDue,
-    }
+    };
   }).filter((issue) => issue.shouldSend3Days || issue.shouldSendDue);
 
   let sentCount = 0;
