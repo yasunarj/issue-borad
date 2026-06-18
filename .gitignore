@@ -48,7 +48,7 @@ dist/
 **/dist/
 
 # lambda deploy artifacts
-apps/infra/lambda-thumbnail/deploy/
+**/deploy/
 
 # vite / vitest artifacts
 .vite/
