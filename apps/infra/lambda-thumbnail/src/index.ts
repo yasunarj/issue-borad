@@ -1,25 +1,56 @@
 import type { S3Event } from "aws-lambda";
-import { DeleteBucketOwnershipControls$, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
 import { Buffer } from "node:buffer";
 import type { Readable } from "node:stream";
 import sharp from "sharp";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl) {
-  throw new Error("SUPABASE_URL is missing");
-}
-
-if (!supabaseServiceRoleKey) {
-  throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing");
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const s3Client = new S3Client({});
 // 引数の{}はconstructorに特に渡すものがなく(ないというかregion: process.env.AWS_RESIONが自動で入る)、Lambdaの実行環境に任せるということを表している
+const ssmClient = new SSMClient({});
+
+let supabaseClient: SupabaseClient | null = null;
+
+const getParameterValue = async (name: string, withDecryption = false) => {
+  const result = await ssmClient.send(
+    new GetParameterCommand({
+      Name: name,
+      WithDecryption: withDecryption,
+      // WithDecryptionがなんだったか忘れてしまった。
+    })
+  );
+
+  if (!result.Parameter?.Value) {
+    throw new Error(`Parameter value is missing: ${name}`);
+  }
+
+  return result.Parameter.Value;
+};
+
+const getSupabaseClient = async () => {
+  if (supabaseClient) {
+    return supabaseClient;
+  }
+
+  const supabaseUrlParamName = process.env.SUPABASE_URL_PARAM_NAME;
+  const supabaseServiceRoleKeyParamName = process.env.SUPABASE_SERVICE_ROLE_KEY_PARAM_NAME;
+
+  if (!supabaseUrlParamName) {
+    throw new Error("SUPABASE_URL_PARAM_NAME is missing");
+  }
+
+  if (!supabaseServiceRoleKeyParamName) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY_PARAM_NAME is missing");
+  }
+
+  const supabaseUrl = await getParameterValue(supabaseUrlParamName);
+  const supabaseServiceRoleKey = await getParameterValue(supabaseServiceRoleKeyParamName, true);
+
+  supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+  return supabaseClient;
+}
 
 const streamToBuffer = async (stream: Readable) => {
   const chunks: Buffer[] = [];
@@ -47,6 +78,8 @@ export const handler = async (event: S3Event) => {
   //引数の 1 は文字列にしたいJavaScriptのオブジェクト。
   //引数の 2 は変換ルール設定。今回は特にないので null。 
   //引数の 3 はインデント。今回は2スペースなので 2 を指定している。CloudWatch Logs で確認するときに綺麗に見える。
+
+  const supabase = await getSupabaseClient();
 
   for (const record of event.Records) {
     const bucket = record.s3.bucket.name;
@@ -177,6 +210,7 @@ export const handler = async (event: S3Event) => {
 //   "type": "module",
 //   "dependencies": {
 //     "@aws-sdk/client-s3": "^3.1056.0",
+//     "@aws-sdk/client-ssm": "^3.1071.0",
 //     "@supabase/supabase-js": "^2.106.2",
 //     "sharp": "^0.34.5"
 //   }

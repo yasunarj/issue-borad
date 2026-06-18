@@ -1,14 +1,30 @@
+import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
+const region = process.env.AWS_REGION ?? "ap-northeast-1";
+const ssmClient = new SSMClient({
+    region,
+});
+const getInternalApiSecret = async () => {
+    const paramName = process.env.INTERNAL_API_SECRET_PARAM_NAME;
+    if (!paramName) {
+        throw new Error("INTERNAL_API_SECRET_PARAM_NAME is missing");
+    }
+    const result = await ssmClient.send(new GetParameterCommand({
+        Name: paramName,
+        WithDecryption: true,
+    }));
+    if (!result.Parameter?.Value) {
+        throw new Error("INTERNAL_API_SECRET parameter value is missing");
+    }
+    return result.Parameter.Value;
+};
 export const handler = async (event) => {
     console.log("reminder runner invoked");
     console.log("event:", JSON.stringify(event, null, 2));
     const url = process.env.REMINDER_RUN_URL;
-    const internalSecret = process.env.INTERNAL_API_SECRET;
     if (!url) {
         throw new Error("REMINDER_RUN_URL is missing");
     }
-    if (!internalSecret) {
-        throw new Error("INTERNAL_API_SECRET is missing");
-    }
+    const internalSecret = await getInternalApiSecret();
     const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -27,3 +43,4 @@ export const handler = async (event) => {
         body: text,
     };
 };
+//# sourceMappingURL=index.js.map
