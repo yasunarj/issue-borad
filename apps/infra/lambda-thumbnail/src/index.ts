@@ -1,5 +1,6 @@
 import type { S3Event } from "aws-lambda";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
 import { Buffer } from "node:buffer";
 import type { Readable } from "node:stream";
@@ -9,6 +10,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 const s3Client = new S3Client({});
 // 引数の{}はconstructorに特に渡すものがなく(ないというかregion: process.env.AWS_RESIONが自動で入る)、Lambdaの実行環境に任せるということを表している
 const ssmClient = new SSMClient({});
+const secretsClient = new SecretsManagerClient({});
 
 let supabaseClient: SupabaseClient | null = null;
 
@@ -17,7 +19,7 @@ const getParameterValue = async (name: string, withDecryption = false) => {
     new GetParameterCommand({
       Name: name,
       WithDecryption: withDecryption,
-      // WithDecryptionがなんだったか忘れてしまった。
+      // WithDecryptionの意味 - parameter storeには StringとSecureStringがある。SecureStringは暗号化されているのでWithDecryption: trueとして複合して受け取らなければいけない。なので今回は暗号化されているSUPABASE_SERVICE_ROLE_KEY_PARAM_NAMEだけ第二引数に true を入れている。
     })
   );
 
@@ -28,7 +30,22 @@ const getParameterValue = async (name: string, withDecryption = false) => {
   return result.Parameter.Value;
 };
 
-const getSupabaseClient = async () => {
+const getSecretString = async (secretId: string) => {
+  const result = await secretsClient.send(
+    new GetSecretValueCommand({
+      SecretId: secretId,
+    })
+  );
+
+  if (!result.SecretString) {
+    throw new Error(`SecretString is empty: ${secretId}`);
+  }
+
+  return result.SecretString;
+}
+
+// SUPABASE_SERVICE_ROLE_KEY を Parameter Store から取得する場合
+const getSupabaseClientParameter = async () => {
   if (supabaseClient) {
     return supabaseClient;
   }
@@ -46,6 +63,38 @@ const getSupabaseClient = async () => {
 
   const supabaseUrl = await getParameterValue(supabaseUrlParamName);
   const supabaseServiceRoleKey = await getParameterValue(supabaseServiceRoleKeyParamName, true);
+
+  supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+  return supabaseClient;
+}
+
+// SUPABASE_SERVICE_ROLE_KEY を Secrets Manager から取得する場合
+const getSupabaseClientSecrets = async () => {
+  if (supabaseClient) {
+    return supabaseClient;
+  }
+
+  const supabaseUrlParameterName = process.env.SUPABASE_URL_PARAM_NAME;
+  const supabaseServiceRoleKeySecretId = process.env.SUPABASE_SERVICE_ROLE_KEY_SECRET_ID;
+
+  if (!supabaseUrlParameterName) {
+    throw new Error("SUPABASE_URL_PARAM_NAME is missing");
+  }
+
+  if (!supabaseServiceRoleKeySecretId) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY_SECRET_ID is missing");
+  }
+
+  const supabaseUrl = await getParameterValue(supabaseUrlParameterName, false);
+  const secretString = await getSecretString(supabaseServiceRoleKeySecretId);
+
+  const parsedSecret = JSON.parse(secretString);
+  const supabaseServiceRoleKey = parsedSecret.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseServiceRoleKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing in secret");
+  }
 
   supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey);
 
@@ -79,7 +128,8 @@ export const handler = async (event: S3Event) => {
   //引数の 2 は変換ルール設定。今回は特にないので null。 
   //引数の 3 はインデント。今回は2スペースなので 2 を指定している。CloudWatch Logs で確認するときに綺麗に見える。
 
-  const supabase = await getSupabaseClient();
+  // const supabase = await getSupabaseClientParameter();
+  const supabase = await getSupabaseClientSecrets();
 
   for (const record of event.Records) {
     const bucket = record.s3.bucket.name;
@@ -211,6 +261,7 @@ export const handler = async (event: S3Event) => {
 //   "dependencies": {
 //     "@aws-sdk/client-s3": "^3.1056.0",
 //     "@aws-sdk/client-ssm": "^3.1071.0",
+//     "@aws-sdk/client-secrets-manager": "^3.1072.0",
 //     "@supabase/supabase-js": "^2.106.2",
 //     "sharp": "^0.34.5"
 //   }
