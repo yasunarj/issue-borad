@@ -128,8 +128,8 @@ export const handler = async (event: S3Event) => {
   //引数の 2 は変換ルール設定。今回は特にないので null。 
   //引数の 3 はインデント。今回は2スペースなので 2 を指定している。CloudWatch Logs で確認するときに綺麗に見える。
 
-  // const supabase = await getSupabaseClientParameter();
-  const supabase = await getSupabaseClientSecrets();
+  const supabase = await getSupabaseClientParameter();
+  // const supabase = await getSupabaseClientSecrets();
 
   for (const record of event.Records) {
     const bucket = record.s3.bucket.name;
