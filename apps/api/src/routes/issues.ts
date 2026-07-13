@@ -409,12 +409,20 @@ issues.patch("/:id/resolve", requireRole(["admin", "member"]), async (c) => {
 
   const { data: current, error: fetchError } = await supabaseAdmin
     .from("issues")
-    .select("status, title")
+    .select("status, title, assigned_to")
     .eq("id", id)
     .single();
 
   if (fetchError || !current) {
     return c.json({ error: "Issue not found" }, 404);
+  }
+
+  if (!current?.assigned_to) {
+    return c.json({ error: "Issue assignee is not set" }, 400);
+  }
+
+  if (current.assigned_to !== user.id) {
+    return c.json({ error: "Only the assignee user can resolve this issue" }, 403)
   }
 
   const { data: profile } = await supabaseAdmin

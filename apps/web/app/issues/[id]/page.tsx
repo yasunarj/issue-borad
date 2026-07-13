@@ -20,7 +20,6 @@ const IssueDetailPage = () => {
   const issueId = params.id as string;
   const { me, isAdmin } = useMe();
   const { isCheckingAuth } = useRequireAuth();
-  const canResolve = me?.role === "admin" || me?.role === "member";
   const [message, setMessage] = useState<{
     text: string;
     type: "success" | "error";
@@ -93,6 +92,9 @@ const IssueDetailPage = () => {
     setMessage,
     onResolved: fetchAuditLogs,
   });
+
+  const canUploadAttachment = me?.role === "admin" || me?.role === "member";
+  const canResolveIssue = Boolean(issue && me && issue.assigned_to === me.id);
 
   useEffect(() => {
     if (!issueId) return;
@@ -283,9 +285,9 @@ const IssueDetailPage = () => {
                   {issue.status}
                 </span>
               </div>
-              {canResolve ? (
+              {canUploadAttachment ? (
                 <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
-                  {canResolve && (
+                  {canResolveIssue && (
                     <LoadingButton
                       className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
                       onClick={handleResolvedIssue}
@@ -432,7 +434,7 @@ const IssueDetailPage = () => {
 
             <AttachmentSection 
               issueId={issueId}
-              canUpload={canResolve}
+              canUpload={canUploadAttachment}
               isAdmin={isAdmin}
               setMessage={setMessage}
               onChanged={fetchAuditLogs}
@@ -513,4 +515,5 @@ const IssueDetailPage = () => {
 };
 
 export default IssueDetailPage;
+
 
