@@ -302,6 +302,7 @@ issues.patch("/:id/assignee", requireRole(["admin"]), async (c) => {
       title,
       due_date,
       assigned_to,
+      status,
       created_by_profile:profiles!issues_created_by_fkey ( display_name )
     `)
     .eq("id", issueId)
@@ -309,6 +310,13 @@ issues.patch("/:id/assignee", requireRole(["admin"]), async (c) => {
 
   if (issueError || !issue) {
     return c.json({ error: "Issue not found" }, 404);
+  }
+
+  if (issue.status === "resolved") {
+    return c.json(
+      { error: "Resolved issue assignee cannot be changed" },
+      400
+    );
   }
 
   const { data: checkedUser, error: checkedUserError } = await supabaseAdmin

@@ -457,6 +457,7 @@ const IssueDetailPage = () => {
                 onAssignee={handleUpdateAssignee}
                 checks={checks ?? []}
                 isUpdatingAssignee={isUpdatingAssignee}
+                isResolved={issue.status === "resolved"}
               />
             )}
             <CommentList

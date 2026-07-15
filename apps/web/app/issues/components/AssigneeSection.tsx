@@ -11,6 +11,7 @@ type AssigneeSectionProps = {
   onAssignee: () => Promise<void>;
   checks: IssueCheck[];
   isUpdatingAssignee: boolean;
+  isResolved: boolean;
 };
 
 const AssigneeSection = ({
@@ -20,6 +21,7 @@ const AssigneeSection = ({
   onAssignee,
   checks,
   isUpdatingAssignee,
+  isResolved,
 }: AssigneeSectionProps) => {
   const [isEditingAssignee, setIsEditingAssignee] = useState<boolean>(false);
 
@@ -60,16 +62,24 @@ const AssigneeSection = ({
             {currentAssigneeName}
           </p>
 
-          <div className="mt-4 flex">
-            <button
-              type="button"
-              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
-              onClick={() => setIsEditingAssignee(true)}
-              disabled={isUpdatingAssignee || checks.length === 0}
-            >
-              担当者を変更
-            </button>
-          </div>
+          {!isResolved && (
+            <div className="mt-4 flex">
+              <button
+                type="button"
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+                onClick={() => setIsEditingAssignee(true)}
+                disabled={isUpdatingAssignee || checks.length === 0}
+              >
+                担当者を変更
+              </button>
+            </div>
+          )}
+
+          {isResolved && (
+            <p className="mt-3 text-xs text-slate-500">
+              解決済みのIssueでは担当者を変更できません。
+            </p>
+          )}
         </div>
       )}
 
