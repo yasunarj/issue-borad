@@ -30,10 +30,17 @@ const createCommentSchema = z.object({
   comment: z.string().trim().min(1, "comment is required").max(1000, "comment too long"),
 });
 
+const resolveIssueSchema = z.object({
+  resolution: z.string().trim().max(2000, "resolution too long").optional(),
+})
+
 issues.use("*", authMiddleware);
 
 issues.get("/", requireRole(["member", "admin", "viewer"]), async (c) => {
-  const { data, error } = await supabaseAdmin
+  const scope = c.req.query("scope");
+  const user = c.get("user");
+
+  let query = supabaseAdmin
     .from("issues")
     .select(`
       id,
@@ -42,7 +49,13 @@ issues.get("/", requireRole(["member", "admin", "viewer"]), async (c) => {
       due_date,
       created_at,
       created_by,
+      assigned_to,
       created_by_profile:profiles!issues_created_by_fkey (
+        id,
+        role,
+        display_name
+      ),
+      assigned_to_profile:profiles!issues_assigned_to_fkey (
         id,
         role,
         display_name
@@ -50,6 +63,12 @@ issues.get("/", requireRole(["member", "admin", "viewer"]), async (c) => {
       comment_count:issue_comments(count)
     `)
     .order("created_at", { ascending: false });
+
+  if (scope === "assigned") {
+    query = query.eq("assigned_to", user.id);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return c.json({ error: error.message }, 500);
@@ -148,6 +167,7 @@ issues.get("/:id", requireRole(["admin", "member", "viewer"]), async (c) => {
       description,
       status,
       due_date,
+      resolution,
       resolved_at,
       created_at,
       updated_at,
@@ -337,12 +357,19 @@ issues.patch("/:id/assignee", requireRole(["admin"]), async (c) => {
 
   const { data: assigneeProfile, error: assigneeProfileError } = await supabaseAdmin
     .from("profiles")
-    .select("id, display_name")
+    .select("id, display_name, role")
     .eq("id", assignedTo)
     .single();
 
   if (assigneeProfileError || !assigneeProfile) {
     return c.json({ error: "Assignee not found" }, 404);
+  }
+
+  if (!["admin", "member"].includes(assigneeProfile.role)) {
+    return c.json(
+      { error: "Viewer users cannot be assigned to issues" },
+      400
+    );
   }
 
   const { data, error } = await supabaseAdmin
@@ -415,6 +442,20 @@ issues.patch("/:id/resolve", requireRole(["admin", "member"]), async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
 
+  const body = await c.req.json().catch(() => ({}));
+  const result = resolveIssueSchema.safeParse(body);
+
+  if (!result.success) {
+    return c.json(
+      {
+        error: result.error.issues[0].message ?? "Invalid request",
+      },
+      400,
+    )
+  }
+
+  const { resolution } = result.data;
+
   const { data: current, error: fetchError } = await supabaseAdmin
     .from("issues")
     .select("status, title, assigned_to")
@@ -433,13 +474,21 @@ issues.patch("/:id/resolve", requireRole(["admin", "member"]), async (c) => {
     return c.json({ error: "Only the assignee user can resolve this issue" }, 403)
   }
 
+  const newStatus = current.status === "resolved" ? "open" : "resolved";
+
+  if (newStatus === "resolved" && !resolution) {
+    return c.json(
+      { error: "Resolution is required" },
+      400,
+    );
+  }
+
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("display_name")
     .eq("id", user.id)
     .single();
 
-  const newStatus = current.status === "resolved" ? "open" : "resolved";
 
   const { data, error } = await supabaseAdmin
     .from("issues")
@@ -447,6 +496,8 @@ issues.patch("/:id/resolve", requireRole(["admin", "member"]), async (c) => {
       status: newStatus,
       resolved_by: newStatus === "resolved" ? user.id : null,
       resolved_at: newStatus === "resolved" ? new Date().toISOString() : null,
+      resolution: newStatus === "resolved" ? resolution : null,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", id)
     .select()
@@ -464,8 +515,9 @@ issues.patch("/:id/resolve", requireRole(["admin", "member"]), async (c) => {
     issueId: data.id,
     detail: {
       status: newStatus,
-    }
-  })
+      resolution: newStatus === "resolved" ? data.resolution : null,
+    },
+  });
 
   try {
     await sendNotifyMail({
@@ -478,6 +530,9 @@ issues.patch("/:id/resolve", requireRole(["admin", "member"]), async (c) => {
       タイトル: ${data.title ?? ""}
       実行者: ${profile?.display_name ?? "不明"}
       新しいステータス: ${newStatus}
+      解決内容: ${
+        newStatus === "resolved" ? data.resolution ?? "" : "-"
+      }
       Issue ID: ${data.id}
       `.trim(),
     })
@@ -780,3 +835,4 @@ issues.get("/:id/audit-logs", requireRole(["admin"]), async (c) => {
 });
 
 export default issues;
+

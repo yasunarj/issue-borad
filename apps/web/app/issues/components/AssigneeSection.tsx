@@ -96,11 +96,17 @@ const AssigneeSection = ({
                 ? "確認をしたユーザーがいません"
                 : "選択してください"}
             </option>
-            {checks.map((check) => (
-              <option key={check.id} value={check.user_id}>
-                {check.user_profile?.display_name ?? "不明"}
-              </option>
-            ))}
+            {checks
+              .filter(
+                (check) =>
+                  check.user_profile &&
+                  ["admin", "member"].includes(check.user_profile.role),
+              )
+              .map((check) => (
+                <option key={check.id} value={check.user_id}>
+                  {check.user_profile?.display_name ?? "不明"}
+                </option>
+              ))}
           </select>
 
           <div className="flex justify-start gap-2">

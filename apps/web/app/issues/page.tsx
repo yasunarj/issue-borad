@@ -70,13 +70,21 @@ const IssuesPage = () => {
             <p className="text-sm font-medium text-blue-700">Issue 管理</p>
             <h1 className="mt-1 text-3xl font-bold">Issue Board</h1>
           </div>
-          <div className="flex flex-col gap-4"> 
+          <div className="flex flex-col gap-4">
             <button
               className="text-sm font-medium text-blue-700"
               onClick={handleLogout}
             >
               ログアウト
             </button>
+
+            <Link
+              href="/issues/assigned"
+              className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm hover:border-blue-300 hover:bg-blue-100"
+            >
+              担当中のIssue
+            </Link>
+
             {isAdmin && (
               <Link
                 className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"

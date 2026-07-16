@@ -22,6 +22,7 @@ export type IssueDetail = {
   status: "open" | "resolved";
   assigned_to: string | null;
   due_date: string | null;
+  resolution: string | null;
   resolved_at: string | null;
   created_at: string;
   updated_at: string;
