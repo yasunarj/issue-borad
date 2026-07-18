@@ -13,6 +13,7 @@ export type IssueListItem = {
   created_by: string;
   created_by_profile: ProfileRef | null;
   comment_count: number;
+  assigned_to: string;
 };
 
 export type IssueDetail = {

@@ -37,6 +37,11 @@ const IssueDetailPage = () => {
   const [selectedAssignee, setSelectedAssignee] = useState<string>("");
   const [isUpdatingAssignee, setIsUpdatingAssignee] = useState<boolean>(false);
 
+  const [resolutionInput, setResolutionInput] = useState<string>("");
+  const [resolutionAiText, setResolutionAiText] = useState<string>("");
+  const [isResolutionAiLoading, setIsResolutionAiLoading] =
+    useState<boolean>(false);
+
   const [editAiText, setEditAiText] = useState<string>("");
   const [isEditAiLoading, setIsEditAiLoading] = useState<boolean>(false);
 
@@ -228,6 +233,72 @@ const IssueDetailPage = () => {
     }
   };
 
+  const handleSubmitResolution = async () => {
+    if (!issue) return;
+
+    if (issue.status === "open" && !resolutionInput.trim()) {
+      setMessage({
+        text: "解決内容を入力してください",
+        type: "error",
+      });
+      return;
+    }
+
+    await handleResolvedIssue(
+      issue.status === "open" ? resolutionInput.trim() : undefined,
+    );
+
+    if (issue.status === "open") {
+      setResolutionInput("");
+    }
+  };
+
+  const handleResolutionAiFormat = async () => {
+    const trimmedResolution = resolutionInput.trim();
+
+    if (!trimmedResolution) {
+      setMessage({
+        text: "AIで整える解決内容を入力してください",
+        type: "error",
+      });
+      return;
+    }
+
+    setIsResolutionAiLoading(true);
+    setMessage(null);
+
+    try {
+      const res = await apiFetch("/ai/format-text", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: trimmedResolution,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage({
+          text: data.message ?? "AI整形に失敗しました",
+          type: "error",
+        });
+        return;
+      }
+
+      setResolutionAiText(data.text);
+    } catch (e) {
+      setMessage({
+        text: e instanceof Error ? e.message : "AI整形に失敗しました",
+        type: "error",
+      });
+    } finally {
+      setIsResolutionAiLoading(false);
+    }
+  };
+
   if (isCheckingAuth) {
     return <p>確認中...</p>;
   }
@@ -285,48 +356,30 @@ const IssueDetailPage = () => {
                   {issue.status}
                 </span>
               </div>
-              {canUploadAttachment ? (
+              {isAdmin && (
                 <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
-                  {canResolveIssue && (
-                    <LoadingButton
-                      className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-                      onClick={handleResolvedIssue}
-                      isLoading={isResolving}
-                      loadingText={
-                        issue.status === "open" ? "解決中..." : "更新中..."
-                      }
-                    >
-                      {issue.status === "open" ? "解決" : "未解決に戻す"}
-                    </LoadingButton>
-                  )}
-                  {isAdmin && (
-                    <>
-                      <button
-                        className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
-                        onClick={() => setIsEditing(true)}
-                      >
-                        編集
-                      </button>
-                      <LoadingButton
-                        className="rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50 disabled:hidden"
-                        onClick={handleDeleteIssue}
-                        disabled={isEditing}
-                        isLoading={isDeleting}
-                        loadingText="削除中..."
-                      >
-                        削除
-                      </LoadingButton>
-                      <button
-                        className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
-                        onClick={() => setIsShowAuditLogs((prev) => !prev)}
-                      >
-                        {isShowAuditLogs ? "ログ非表示" : "ログ表示"}
-                      </button>
-                    </>
-                  )}
+                  <button
+                    className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    編集
+                  </button>
+                  <LoadingButton
+                    className="rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50 disabled:hidden"
+                    onClick={handleDeleteIssue}
+                    disabled={isEditing}
+                    isLoading={isDeleting}
+                    loadingText="削除中..."
+                  >
+                    削除
+                  </LoadingButton>
+                  <button
+                    className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
+                    onClick={() => setIsShowAuditLogs((prev) => !prev)}
+                  >
+                    {isShowAuditLogs ? "ログ非表示" : "ログ表示"}
+                  </button>
                 </div>
-              ) : (
-                <span></span>
               )}
             </div>
 
@@ -375,7 +428,9 @@ const IssueDetailPage = () => {
                 )}
 
                 <div className="flex items-center gap-4 w-full">
-                  <label className="shrink-0 text-sm text-slate-500">期日</label>
+                  <label className="shrink-0 text-sm text-slate-500">
+                    期日
+                  </label>
                   <input
                     type="date"
                     style={{
@@ -416,6 +471,128 @@ const IssueDetailPage = () => {
               </p>
             )}
 
+            {canResolveIssue && issue.status === "open" && (
+              <div className="flex flex-col gap-4 rounded-md border border-blue-200 bg-blue-50 p-5">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">
+                    解決内容
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-600">
+                    対応した内容と、どのように解決したかを入力してください。
+                  </p>
+                </div>
+
+                <textarea
+                  className="min-h-32 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-6 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  value={resolutionInput}
+                  onChange={(e) => setResolutionInput(e.target.value)}
+                  placeholder="例：発注設定を修正し、翌自治の納品数が正常であることを確認しました。"
+                  maxLength={2000}
+                  disabled={isResolving}
+                />
+
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-xs text-slate-500">
+                    {resolutionInput.length} / 2000文字
+                  </p>
+
+                  <LoadingButton
+                    className="w-fit rounded-md border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={handleResolutionAiFormat}
+                    disabled={!resolutionInput.trim() || isResolving}
+                    isLoading={isResolutionAiLoading}
+                    loadingText="整形中..."
+                  >
+                    AIで整える
+                  </LoadingButton>
+                </div>
+
+                {resolutionAiText && (
+                  <div className="rounded-md border border-blue-200 bg-white p-4">
+                    <p className="text-sm font-medium text-blue-700">
+                      AI整形案
+                    </p>
+
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                      {resolutionAiText}
+                    </p>
+
+                    <button
+                      type="button"
+                      className="mt-3 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                      onClick={() => {
+                        setResolutionInput(resolutionAiText);
+                        setResolutionAiText("");
+                      }}
+                    >
+                      この文章を使う
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <LoadingButton
+                    className="rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={handleSubmitResolution}
+                    disabled={!resolutionInput.trim() || isResolutionAiLoading}
+                    isLoading={isResolving}
+                    loadingText="解決中..."
+                  >
+                    この内容で解決する
+                  </LoadingButton>
+                </div>
+              </div>
+            )}
+
+            {issue.status === "resolved" && (
+              <div className="flex flex-col gap-4 rounded-md border border-green-200 bg-green-50 p-5">
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-base font-semibold text-green-800">
+                      解決内容
+                    </h3>
+
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-green-700 ">
+                      解決済み
+                    </span>
+                  </div>
+
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
+                    {issue.resolution ?? "解決内容は登録されていません"}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-green-200 pt-3 text-xs text-slate-600">
+                  <span>
+                    解決者:{" "}
+                    <strong className="font-semibold text-slate-800">
+                      {issue.resolved_by_profile?.display_name ?? "不明"}
+                    </strong>
+                  </span>
+
+                  <span>
+                    解決日時:{" "}
+                    {issue.resolved_at
+                      ? new Date(issue.resolved_at).toLocaleString("ja-JP")
+                      : "-"}
+                  </span>
+                </div>
+
+                {canResolveIssue && (
+                  <div className="flex justify-end">
+                    <LoadingButton
+                      className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+                      onClick={handleSubmitResolution}
+                      isLoading={isResolving}
+                      loadingText="更新中..."
+                    >
+                      未解決に戻す
+                    </LoadingButton>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid gap-3 rounded-md border border-slate-100 bg-white p-4 text-xs text-slate-500 sm:grid-cols-2 lg:grid-cols-4">
               <span>
                 作成者: {issue.created_by_profile?.display_name ?? "不明"}さん
@@ -424,15 +601,9 @@ const IssueDetailPage = () => {
               <span>
                 作成日: {new Date(issue.created_at).toLocaleString("ja-jp")}
               </span>
-              <span>
-                解決日時:{" "}
-                {issue.resolved_at
-                  ? new Date(issue.resolved_at).toLocaleString("ja-jp")
-                  : "-"}
-              </span>
             </div>
 
-            <AttachmentSection 
+            <AttachmentSection
               issueId={issueId}
               canUpload={canUploadAttachment}
               isAdmin={isAdmin}
@@ -516,5 +687,3 @@ const IssueDetailPage = () => {
 };
 
 export default IssueDetailPage;
-
-

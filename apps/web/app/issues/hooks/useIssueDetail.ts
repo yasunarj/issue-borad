@@ -195,11 +195,18 @@ const useIssueDetail = ({
     }
   }, [issueId, router, setMessage]);
 
-  const handleResolvedIssue = useCallback(async () => {
+  const handleResolvedIssue = useCallback(async (resolution?: string) => {
     setIsResolving(true);
+
     try {
       const res = await apiFetch(`/issues/${issueId}/resolve`, {
         method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          resolution,
+        })
       });
 
       const data = await res.json();

@@ -11,7 +11,7 @@ import { apiFetch } from "../lib/api/client";
 import { supabase } from "@/lib/supabase/client";
 
 const IssuesPage = () => {
-  const { isAdmin } = useMe();
+  const { me, isAdmin } = useMe();
   const router = useRouter();
   const [issues, setIssues] = useState<IssueListItem[]>([]);
   const [message, setMessage] = useState<{
@@ -21,6 +21,12 @@ const IssuesPage = () => {
 
   const openIssues = issues.filter((issue) => issue.status === "open");
   const resolvedIssues = issues.filter((issue) => issue.status === "resolved");
+
+  const assignedOpenIssuesCount = issues.filter(
+    (issue) => issue.assigned_to === me?.id && issue.status === "open",
+  ).length;
+
+  const hasAssignedOpenIssues = assignedOpenIssuesCount > 0;
 
   const fetchIssues = useCallback(async () => {
     try {
@@ -80,9 +86,18 @@ const IssuesPage = () => {
 
             <Link
               href="/issues/assigned"
-              className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm hover:border-blue-300 hover:bg-blue-100"
+              className={`relative inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium shadow-sm transition-all duration-300 ${
+                hasAssignedOpenIssues
+                  ? "animate-pulse border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-300/60 hover:bg-blue-700"
+                  : "border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100"
+              }`}
             >
               担当中のIssue
+              {hasAssignedOpenIssues && (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-xs font-bold text-blue-700">
+                  {assignedOpenIssuesCount}
+                </span>
+              )}
             </Link>
 
             {isAdmin && (
